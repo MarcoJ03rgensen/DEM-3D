@@ -279,6 +279,107 @@
         #stat-display {
             font-size: 0.7rem; color: #888; margin-top: 5px; font-family: monospace;
         }
+
+        /* ===== CINEMA / 4K REEL MODE ===== */
+        #cinema-panel {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.93);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            width: 320px;
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.12);
+            z-index: 30;
+            display: none;
+            max-height: 88vh;
+            overflow-y: auto;
+        }
+        #cinema-panel::-webkit-scrollbar { width: 3px; }
+        #cinema-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 2px; }
+        #cinema-panel h2 { margin: 0 0 12px 0; font-size: 0.95rem; color: #f09433; letter-spacing: 0.5px; }
+        #cinema-panel .cp-section { margin-bottom: 13px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; }
+        #cinema-panel .cp-section:last-child { border-bottom: none; margin-bottom: 0; }
+        #cinema-panel .cp-label { font-size: 0.72rem; color: #aaa; display: block; margin-bottom: 3px; }
+        #cinema-panel .cp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        #cinema-panel .cp-row .cp-label { margin: 0; }
+        #cinema-panel select,
+        #cinema-panel input[type="text"],
+        #cinema-panel input[type="number"] {
+            background: #1e1e1e; color: white; border: 1px solid #444;
+            padding: 5px 6px; border-radius: 5px; font-size: 0.79rem;
+            width: 148px; box-sizing: border-box;
+        }
+        #cinema-panel input[type="range"] { width: 148px; accent-color: #f09433; cursor: pointer; }
+        #cinema-frame-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 15;
+            display: none;
+            flex-direction: row;
+            align-items: stretch;
+        }
+        .cinema-bar { background: rgba(0,0,0,0.68); flex: 1; }
+        #cinema-frame-box {
+            height: 100%;
+            aspect-ratio: 9 / 16;
+            flex-shrink: 0;
+            border-left: 2px solid rgba(255,255,255,0.55);
+            border-right: 2px solid rgba(255,255,255,0.55);
+            box-sizing: border-box;
+            position: relative;
+        }
+        #cinema-frame-label {
+            position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+            color: rgba(255,255,255,0.85); font-size: 0.68rem; background: rgba(0,0,0,0.6);
+            padding: 3px 10px; border-radius: 4px; white-space: nowrap; pointer-events: none;
+        }
+
+        /* Render overlay */
+        #render-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none;
+            flex-direction: column; align-items: center; justify-content: center;
+            z-index: 60; color: white; text-align: center; gap: 14px;
+            backdrop-filter: blur(5px);
+        }
+        #render-status-text { font-size: 1rem; font-weight: 600; max-width: 80%; line-height: 1.5; }
+        #render-progress-wrap { width: 60%; height: 8px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; }
+        #render-progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #f09433, #dc2743, #bc1888); border-radius: 4px; }
+        #render-progress-pct { font-size: 0.85rem; opacity: 0.6; font-variant-numeric: tabular-nums; }
+
+        /* Keyframe list */
+        #kf-list { max-height: 185px; overflow-y: auto; margin-bottom: 8px; }
+        #kf-list::-webkit-scrollbar { width: 3px; }
+        #kf-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 2px; }
+        .kf-item {
+            background: rgba(255,255,255,0.06); padding: 7px 10px; border-radius: 7px;
+            margin-bottom: 4px; display: flex; justify-content: space-between;
+            align-items: center; font-size: 0.79rem; transition: background 0.15s;
+        }
+        .kf-item:hover { background: rgba(255,255,255,0.11); }
+        .kf-item .kf-actions span { cursor: pointer; margin-left: 8px; opacity: 0.62; font-size: 0.88rem; transition: opacity 0.15s; }
+        .kf-item .kf-actions span:hover { opacity: 1; }
+        .kf-dur-input {
+            width: 42px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: white; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 0.75rem;
+        }
+        #kf-total {
+            background: rgba(0,0,0,0.4); padding: 7px 10px; border-radius: 7px;
+            text-align: center; font-size: 0.8rem; margin-bottom: 10px;
+        }
+        #kf-total-sec { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+        /* Instagram gradient button */
+        .btn-instagram {
+            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+        }
+        .btn-instagram:hover { filter: brightness(1.12); }
+
     </style>
 </head>
 <body>
@@ -351,7 +452,114 @@
         <label>4. Exports</label>
         <button id="btn-export" class="btn btn-green">💾 3D Model (.glb)</button>
         <button id="btn-export-dem" class="btn btn-orange" style="display:none">🗺️ Export GeoTIFF</button>
+        <button id="btn-open-cinema" class="btn btn-instagram" style="margin-top:6px;">🎬 4K Reel Studio (9:16)</button>
     </div>
+</div>
+
+<!-- ===== CINEMA MODE PANEL ===== -->
+<div id="cinema-panel">
+    <h2>🎬 4K Reel Studio <span style="font-size:0.7rem;opacity:0.45;font-weight:normal;">9:16 Instagram</span></h2>
+
+    <div class="cp-section">
+        <span class="cp-label">Watermark Text</span>
+        <input type="text" id="cp-watermark" placeholder="@yourhandle" style="width:100%">
+    </div>
+
+    <div class="cp-section">
+        <div id="kf-total">
+            Total: <span id="kf-total-sec">0.0</span>s
+            <span id="kf-total-frames" style="font-size:0.68rem;opacity:0.55;display:block;margin-top:2px;">0 frames @ 60fps · 80 Mbps · 4K</span>
+        </div>
+        <div class="cp-row">
+            <span class="cp-label">Secs / Keyframe</span>
+            <input type="number" id="cp-duration" value="4" step="0.5" min="0.5" max="60">
+        </div>
+        <div class="cp-row">
+            <span class="cp-label">Global Easing</span>
+            <select id="cp-easing">
+                <option value="linear">Linear</option>
+                <option value="easeIn">Ease In</option>
+                <option value="easeOut">Ease Out</option>
+                <option value="easeInOut">Ease In-Out</option>
+                <option value="smootherstep" selected>Smootherstep</option>
+                <option value="cinematic">Cinematic</option>
+            </select>
+        </div>
+        <div class="cp-row">
+            <span class="cp-label">Loop Mode</span>
+            <select id="cp-loop">
+                <option value="none">No Loop</option>
+                <option value="loop">Loop</option>
+                <option value="pingpong">Ping-Pong</option>
+            </select>
+        </div>
+        <div class="cp-row">
+            <span class="cp-label">Pace</span>
+            <input type="range" id="cp-pace" min="0.25" max="4" step="0.25" value="1">
+        </div>
+        <div class="cp-row">
+            <span class="cp-label">Motion Blur</span>
+            <select id="cp-motionblur">
+                <option value="0" selected>Off</option>
+                <option value="4">4 samples</option>
+                <option value="8">8 samples</option>
+                <option value="16">16 samples (slow)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="cp-section">
+        <span class="cp-label" style="margin-bottom:6px;">Keyframes</span>
+        <div id="kf-list">
+            <div id="kf-empty-msg" style="opacity:0.5;text-align:center;padding:10px;font-size:0.78rem;">Navigate with FPS controls,<br>then add keyframes.</div>
+        </div>
+        <button id="btn-add-kf" class="btn" style="margin-bottom:5px;">+ Add Current View</button>
+        <div style="display:flex;gap:5px;">
+            <button id="btn-preview-kf" class="btn btn-outline" style="flex:1;" disabled>▶ Preview</button>
+            <button id="btn-clear-kf" class="btn btn-secondary" style="flex:1;" disabled>✕ Clear</button>
+        </div>
+    </div>
+
+    <div class="cp-section">
+        <button id="btn-render-reel" class="btn btn-instagram" disabled>🎬 Export 4K Reel (MP4)</button>
+        <div style="font-size:0.68rem;color:#888;margin-top:5px;text-align:center;">2160 × 3840 · 60 fps · 80 Mbps (H.264 L5.2)</div>
+    </div>
+
+    <div style="display:flex;gap:5px;margin-top:2px;">
+        <button id="btn-exit-cinema" class="btn btn-secondary" style="width:100%">✕ Exit Cinema Mode</button>
+    </div>
+</div>
+
+<!-- 9:16 frame crop overlay -->
+<div id="cinema-frame-overlay">
+    <div class="cinema-bar"></div>
+    <div id="cinema-frame-box">
+        <div id="cinema-frame-label">9:16 · 4K Reel (2160×3840)</div>
+        <!-- Shown when unlocked: invite user to click and move -->
+        <div id="cinema-click-hint" style="display:none; position:absolute; bottom:60px; left:50%; transform:translateX(-50%);
+             background:rgba(0,0,0,0.72); color:white; padding:10px 18px; border-radius:30px;
+             font-size:0.82rem; white-space:nowrap; pointer-events:none; text-align:center;
+             border:1px solid rgba(255,255,255,0.18); backdrop-filter:blur(6px); line-height:1.6;">
+            👉 Click terrain to navigate<br>
+            <span style="opacity:0.6;font-size:0.73rem;">WASD = move &bull; Mouse = look &bull; ESC = back to panel</span>
+        </div>
+        <!-- Shown while pointer is locked -->
+        <div id="cinema-nav-hint" style="display:none; position:absolute; top:60px; left:50%; transform:translateX(-50%);
+             background:rgba(0,0,0,0.65); color:white; padding:8px 16px; border-radius:30px;
+             font-size:0.78rem; white-space:nowrap; pointer-events:none;
+             border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(6px);">
+            🏃 Navigating · <strong>ESC</strong> = back to panel &bull; <strong>F</strong> = flight mode
+        </div>
+    </div>
+    <div class="cinema-bar"></div>
+</div>
+
+<!-- Render progress overlay -->
+<div id="render-overlay">
+    <div id="render-status-text">Rendering 4K Reel...</div>
+    <div id="render-progress-wrap"><div id="render-progress-bar"></div></div>
+    <div id="render-progress-pct">0%</div>
+    <div style="font-size:0.73rem;opacity:0.45;margin-top:-6px;">Keep this tab open &amp; active during export.</div>
 </div>
 
 <div id="blocker">
@@ -369,6 +577,8 @@
 </div>
 
 <div id="canvas-container"></div>
+
+<script src="https://unpkg.com/mp4-muxer@3.0.0/build/mp4-muxer.js"></script>
 
 <script type="importmap">
     {
@@ -397,8 +607,7 @@
     
     // --- Globals ---
     let camera, scene, renderer, controls;
-    let terrainGroup = null; 
-    let waterMesh;
+    let terrainGroup = null;
     
     let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
     let canJump = false, isRunning = false;
@@ -426,7 +635,19 @@
     let cameraPitch = 0; 
 
     let currentAspect = 1.0; 
-    
+
+    // --- Cinema / 4K Reel Export ---
+    let isCinemaMode = false;
+    let isCinemaPreview = false;
+    let cinemaPreviewStart = 0;
+    let cinemaPreviewDuration = 0;
+    let isReelRendering = false;
+    let cinemaKeyframes = [];   // [{pos, yaw, pitch, duration}]
+    let _cinemaCurve = null;    // active CatmullRom curve during preview/export
+
+    // Export constants
+    const REEL_WIDTH = 2160, REEL_HEIGHT = 3840, REEL_FPS = 60, REEL_BITRATE = 80_000_000;
+
     init();
     animate();
 
@@ -467,6 +688,7 @@
         scene.add(terrainGroup);
 
         setupEvents();
+        setupCinemaEvents();
         
         generateAdvancedRandomTerrain();
     }
@@ -486,11 +708,24 @@
         controls.addEventListener('lock', () => {
             instructions.style.display = 'none';
             blocker.style.display = 'none';
-            document.getElementById('ui-layer').style.opacity = '0.3';
+            if (isCinemaMode) {
+                // Dimly hide cinema panel while navigating; show ESC hint
+                document.getElementById('cinema-panel').style.opacity = '0.15';
+                document.getElementById('cinema-panel').style.pointerEvents = 'none';
+                document.getElementById('cinema-nav-hint').style.display = 'flex';
+            } else {
+                document.getElementById('ui-layer').style.opacity = '0.3';
+            }
         });
 
         controls.addEventListener('unlock', () => {
-            if(!isMobile) {
+            if (isCinemaMode) {
+                // Restore cinema panel and show click-to-navigate prompt
+                document.getElementById('cinema-panel').style.opacity = '1';
+                document.getElementById('cinema-panel').style.pointerEvents = 'auto';
+                document.getElementById('cinema-nav-hint').style.display = 'none';
+                document.getElementById('cinema-click-hint').style.display = 'flex';
+            } else if (!isMobile) {
                 blocker.style.display = 'flex';
                 instructions.style.display = '';
                 document.getElementById('ui-layer').style.opacity = '1';
@@ -573,8 +808,6 @@
             if(mesh.material) mesh.material.dispose();
             terrainGroup.remove(mesh);
         }
-        if (waterMesh) scene.remove(waterMesh);
-
         window.terrainW = width;
         window.terrainH = height;
 
@@ -696,27 +929,6 @@
             }
         }
 
-        // Only add water if there are actually low-elevation areas (below 0.15 normalized height)
-        // and if using Nature color style
-        let hasWaterAreas = false;
-        if (style === 'nature') {
-            for (let i = 0; i < processedHeightData.length; i++) {
-                if (processedHeightData[i] < 0.15) {
-                    hasWaterAreas = true;
-                    break;
-                }
-            }
-        }
-        
-        if (hasWaterAreas) {
-            const waterGeo = new THREE.PlaneGeometry(currentWorldWidth, currentWorldDepth);
-            waterGeo.rotateX(-Math.PI / 2);
-            const waterMat = new THREE.MeshStandardMaterial({ color: 0x0077be, transparent: true, opacity: 0.6, roughness: 0.1, metalness: 0.5 });
-            waterMesh = new THREE.Mesh(waterGeo, waterMat);
-            waterMesh.position.y = HEIGHT_SCALE * 0.15; // Match the threshold in color scheme
-            scene.add(waterMesh);
-        }
-
         if(velocity.length() === 0) controls.getObject().position.set(0, HEIGHT_SCALE + 50, 0);
     }
 
@@ -745,9 +957,6 @@
             geo.computeVertexNormals();
         });
 
-        if(waterMesh) {
-            waterMesh.position.y = HEIGHT_SCALE * 0.15;
-        }
     }
 
     function exportGLB() {
@@ -759,7 +968,6 @@
         setTimeout(() => {
             const exporter = new GLTFExporter();
             const exportList = [terrainGroup];
-            if(waterMesh) exportList.push(waterMesh);
 
             exporter.parse(
                 exportList,
@@ -1406,12 +1614,454 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
+    // =====================================================================
+    //  CINEMA MODE — 4K Reel Export (9:16 Instagram)
+    // =====================================================================
+
+    // --- Easing ---
+    function _easeLinear(x)       { return x; }
+    function _easeIn(x)           { return x * x * x; }
+    function _easeOut(x)          { return 1 - Math.pow(1 - x, 3); }
+    function _easeInOut(x)        { return x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x+2,3)/2; }
+    function _easeSmootherStep(x) { return x*x*x*(x*(x*6-15)+10); }
+    function _easeCinematic(x) {
+        if (x < 0.15) return _easeIn(x/0.15)*0.15;
+        if (x > 0.85) return 0.85 + _easeOut((x-0.85)/0.15)*0.15;
+        return 0.15 + (x - 0.15);
+    }
+    const CINEMA_EASING = {
+        linear: _easeLinear, easeIn: _easeIn, easeOut: _easeOut,
+        easeInOut: _easeInOut, smootherstep: _easeSmootherStep, cinematic: _easeCinematic
+    };
+
+    // --- Enter / Exit Cinema Mode ---
+    function enterCinemaMode() {
+        isCinemaMode = true;
+        if (controls.isLocked) controls.unlock();
+        document.getElementById('cinema-panel').style.display = 'block';
+        document.getElementById('cinema-panel').style.opacity = '1';
+        document.getElementById('cinema-panel').style.pointerEvents = 'auto';
+        document.getElementById('cinema-frame-overlay').style.display = 'flex';
+        document.getElementById('cinema-click-hint').style.display = 'flex';
+        document.getElementById('cinema-nav-hint').style.display = 'none';
+        document.getElementById('ui-layer').style.display = 'none';
+        document.getElementById('minimap-container').style.display = 'none';
+        document.getElementById('blocker').style.display = 'none';
+
+        // Clicking the canvas (not on UI) locks FPS navigation
+        const container = document.getElementById('canvas-container');
+        container._cinemaClickHandler = (e) => {
+            if (isCinemaMode && !controls.isLocked &&
+                !e.target.closest('#cinema-panel') &&
+                !e.target.closest('#cinema-frame-overlay')) {
+                controls.lock();
+            }
+        };
+        container.addEventListener('click', container._cinemaClickHandler);
+    }
+
+    function exitCinemaMode() {
+        isCinemaMode = false;
+        isCinemaPreview = false;
+        _cinemaCurve = null;
+        if (controls.isLocked) controls.unlock();
+        // Remove canvas click handler
+        const container = document.getElementById('canvas-container');
+        if (container._cinemaClickHandler) {
+            container.removeEventListener('click', container._cinemaClickHandler);
+            container._cinemaClickHandler = null;
+        }
+        document.getElementById('cinema-panel').style.display = 'none';
+        document.getElementById('cinema-frame-overlay').style.display = 'none';
+        document.getElementById('cinema-click-hint').style.display = 'none';
+        document.getElementById('cinema-nav-hint').style.display = 'none';
+        document.getElementById('ui-layer').style.display = 'block';
+        document.getElementById('minimap-container').style.display = 'flex';
+        document.getElementById('blocker').style.display = 'flex';
+    }
+
+    // --- Keyframe Management ---
+    function addCinemaKeyframe() {
+        const pos  = camera.position.clone();
+        const quat = camera.quaternion.clone();
+        const dur  = parseFloat(document.getElementById('cp-duration').value) || 4;
+        cinemaKeyframes.push({ pos, quat, duration: dur });
+        updateKfUI();
+    }
+
+    window.deleteCinemaKf = function(i) { cinemaKeyframes.splice(i, 1); updateKfUI(); };
+
+    window.gotoCinemaKf = function(i) {
+        if (!cinemaKeyframes[i]) return;
+        const kf = cinemaKeyframes[i];
+        camera.position.copy(kf.pos);
+        camera.quaternion.copy(kf.quat);
+    };
+
+    window.updateCinemaKfDur = function(i, v) {
+        if (cinemaKeyframes[i]) { cinemaKeyframes[i].duration = parseFloat(v) || 4; updateKfTotalTime(); }
+    };
+
+    function updateKfUI() {
+        const list = document.getElementById('kf-list');
+        if (cinemaKeyframes.length === 0) {
+            list.innerHTML = '<div id="kf-empty-msg" style="opacity:0.5;text-align:center;padding:10px;font-size:0.78rem;">Navigate with FPS controls,<br>then add keyframes.</div>';
+        } else {
+            list.innerHTML = '';
+            cinemaKeyframes.forEach((kf, i) => {
+                const el = document.createElement('div');
+                el.className = 'kf-item';
+                const dur = kf.duration || 4;
+                el.innerHTML = `
+                    <div>
+                        <strong>KF ${i+1}</strong>
+                        ${i > 0
+                            ? `<span style="font-size:0.72rem;opacity:0.6;margin-left:6px;">
+                                   <input type="number" class="kf-dur-input" value="${dur}" step="0.5" min="0.5" max="60"
+                                          onchange="window.updateCinemaKfDur(${i}, this.value)">s
+                               </span>`
+                            : '<span style="font-size:0.7rem;opacity:0.45;margin-left:6px;">Start</span>'}
+                    </div>
+                    <div class="kf-actions">
+                        <span title="Go to view" onclick="window.gotoCinemaKf(${i})">👁️</span>
+                        <span title="Delete" onclick="window.deleteCinemaKf(${i})">🗑️</span>
+                    </div>`;
+                list.appendChild(el);
+            });
+        }
+        const can = cinemaKeyframes.length >= 2;
+        document.getElementById('btn-preview-kf').disabled  = !can;
+        document.getElementById('btn-clear-kf').disabled    = cinemaKeyframes.length === 0;
+        document.getElementById('btn-render-reel').disabled = !can;
+        updateKfTotalTime();
+    }
+
+    function getKfTotalDuration() {
+        const pace     = parseFloat(document.getElementById('cp-pace').value) || 1;
+        const defDur   = parseFloat(document.getElementById('cp-duration').value) || 4;
+        let total = 0;
+        for (let i = 1; i < cinemaKeyframes.length; i++) total += (cinemaKeyframes[i].duration || defDur) / pace;
+        return total;
+    }
+
+    function updateKfTotalTime() {
+        const total   = getKfTotalDuration();
+        const loop    = document.getElementById('cp-loop').value;
+        const display = loop === 'pingpong' ? total * 2 : total;
+        document.getElementById('kf-total-sec').textContent    = display.toFixed(1);
+        document.getElementById('kf-total-frames').textContent =
+            `${Math.ceil(display * REEL_FPS)} frames @ ${REEL_FPS}fps · ${(REEL_BITRATE/1e6).toFixed(0)} Mbps · 4K`;
+    }
+
+    // --- Curve & Progress Helpers ---
+    function buildCinemaCurve() {
+        const curve = new THREE.CatmullRomCurve3(cinemaKeyframes.map(k => k.pos));
+        curve.curveType = 'centripetal';
+        return curve;
+    }
+
+    function getSegmentTimes() {
+        const pace   = parseFloat(document.getElementById('cp-pace').value) || 1;
+        const defDur = parseFloat(document.getElementById('cp-duration').value) || 4;
+        const segs = [];
+        let total = 0;
+        for (let i = 1; i < cinemaKeyframes.length; i++) {
+            const d = (cinemaKeyframes[i].duration || defDur) / pace;
+            segs.push({ start: total, duration: d });
+            total += d;
+        }
+        return { segs, total };
+    }
+
+    function cinemaProgressToState(globalT, segs, totalDur) {
+        const timePos = globalT * totalDur;
+        let seg = segs.length - 1;
+        for (let i = 0; i < segs.length; i++) {
+            if (timePos <= segs[i].start + segs[i].duration) { seg = i; break; }
+        }
+        const localT  = Math.max(0, Math.min(1, (timePos - segs[seg].start) / segs[seg].duration));
+        const fn      = CINEMA_EASING[document.getElementById('cp-easing').value] || _easeSmootherStep;
+        const easedT  = fn(localT);
+        const curveT  = Math.max(0, Math.min(1, (seg + easedT) / (cinemaKeyframes.length - 1)));
+        return { curveT, segIndex: seg, localT: easedT };
+    }
+
+    function applyCinemaState(globalT, curve, segs, totalDur) {
+        const { curveT, segIndex, localT } = cinemaProgressToState(globalT, segs, totalDur);
+        // getPointAt uses arc-length parameterisation → even speed along path
+        camera.position.copy(curve.getPointAt(curveT));
+
+        // Slerp quaternion — exact round-trip, no Euler-order drift
+        const kfA = cinemaKeyframes[segIndex];
+        const kfB = cinemaKeyframes[Math.min(segIndex + 1, cinemaKeyframes.length - 1)];
+        camera.quaternion.slerpQuaternions(kfA.quat, kfB.quat, localT);
+    }
+
+    // --- Live Preview ---
+    function startCinemaPreview() {
+        if (cinemaKeyframes.length < 2) return;
+        _cinemaCurve = buildCinemaCurve();
+        isCinemaPreview = true;
+        if (controls.isLocked) controls.unlock();
+        const { total } = getSegmentTimes();
+        const loop = document.getElementById('cp-loop').value;
+        cinemaPreviewDuration = (loop === 'pingpong' ? total * 2 : total) * 1000;
+        cinemaPreviewStart = performance.now();
+    }
+
+    // --- Watermark helpers ---
+    let _wmScene = null, _wmCamera = null, _wmCanvas = null, _wmCtx = null, _wmTex = null;
+
+    function initWatermark(w, h) {
+        _wmScene  = new THREE.Scene();
+        _wmCanvas = document.createElement('canvas');
+        _wmCanvas.width = w; _wmCanvas.height = h;
+        _wmCtx    = _wmCanvas.getContext('2d');
+        _wmTex    = new THREE.CanvasTexture(_wmCanvas);
+        const mat = new THREE.MeshBasicMaterial({ map: _wmTex, transparent: true });
+        const geo = new THREE.PlaneGeometry(w, h);
+        const msh = new THREE.Mesh(geo, mat);
+        msh.position.set(0, 0, -1);
+        _wmScene.add(msh);
+        _wmCamera = new THREE.OrthographicCamera(-w/2, w/2, h/2, -h/2, 0, 10);
+        drawWatermark(w, h);
+    }
+
+    function drawWatermark(w, h) {
+        if (!_wmCtx) return;
+        _wmCtx.clearRect(0, 0, w, h);
+        const text = (document.getElementById('cp-watermark').value || '').trim();
+        if (!text) { _wmTex.needsUpdate = true; return; }
+        const fs   = Math.round(70 * (w / REEL_WIDTH));
+        const yPos = Math.round(350 * (h / REEL_HEIGHT));
+        _wmCtx.fillStyle    = 'rgba(255,255,255,0.42)';
+        _wmCtx.font         = `bold ${fs}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        _wmCtx.textAlign    = 'center';
+        _wmCtx.textBaseline = 'middle';
+        _wmCtx.shadowColor  = 'rgba(0,0,0,0.8)';
+        _wmCtx.shadowBlur   = Math.round(10 * (w / REEL_WIDTH));
+        _wmCtx.shadowOffsetX = 2; _wmCtx.shadowOffsetY = 2;
+        _wmCtx.fillText(text, w / 2, yPos);
+        _wmTex.needsUpdate = true;
+    }
+
+    function disposeWatermark() {
+        if (_wmTex) _wmTex.dispose();
+        _wmScene = _wmCamera = _wmCanvas = _wmCtx = _wmTex = null;
+    }
+
+    // --- Render a single composite frame (scene + watermark) ---
+    // --- 4K Offline Export ---
+    async function startReelExport() {
+        if (cinemaKeyframes.length < 2) return;
+        isReelRendering = true;
+        if (controls.isLocked) controls.unlock();
+
+        const overlay = document.getElementById('render-overlay');
+        overlay.style.display = 'flex';
+        document.getElementById('render-status-text').textContent = 'Preparing 4K render…';
+        document.getElementById('render-progress-bar').style.width = '0%';
+        document.getElementById('render-progress-pct').textContent = '0%';
+        document.getElementById('btn-render-reel').disabled = true;
+
+        // ---------------------------------------------------------------
+        // Dedicated export renderer with preserveDrawingBuffer: true
+        // This is REQUIRED — without it, VideoFrame() reads a blank canvas
+        // because the main renderer uses preserveDrawingBuffer: false.
+        // ---------------------------------------------------------------
+        const exportRenderer = new THREE.WebGLRenderer({
+            antialias: true,
+            preserveDrawingBuffer: true,
+            powerPreference: 'high-performance'
+        });
+        exportRenderer.setPixelRatio(1); // exactly REEL_WIDTH × REEL_HEIGHT px
+        exportRenderer.setSize(REEL_WIDTH, REEL_HEIGHT);
+        exportRenderer.shadowMap.enabled = true;
+        exportRenderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+        exportRenderer.autoClear = false;
+
+        // Override camera aspect for 9:16
+        const prevAspect = camera.aspect;
+        camera.aspect = REEL_WIDTH / REEL_HEIGHT;
+        camera.updateProjectionMatrix();
+
+        initWatermark(REEL_WIDTH, REEL_HEIGHT);
+
+        // Disable fog — removes the haze that makes distant terrain look soft/blurry
+        const prevFog = scene.fog;
+        scene.fog = null;
+
+        const curve = buildCinemaCurve();
+        const { segs, total: totalDur } = getSegmentTimes();
+        const loop         = document.getElementById('cp-loop').value;
+        const mbSamples    = parseInt(document.getElementById('cp-motionblur').value) || 0;
+        const renderDurSec = loop === 'pingpong' ? totalDur * 2 : totalDur;
+        const totalFrames  = Math.ceil(renderDurSec * REEL_FPS);
+        const kfInterval   = REEL_FPS; // I-frame every second for reliable seeking
+
+        // H.264 High/Main Profile Level 5.2 and 5.1 only.
+        // Level 6.x is accepted by Chrome's encoder but rejected by virtually
+        // every desktop/mobile player — that’s why the file couldn’t be opened.
+        const codecs = ['avc1.640034', 'avc1.640033', 'avc1.4D4034', 'avc1.4D4033'];
+        let codec = 'avc1.640033'; // Safe fallback: High L5.1
+        for (const c of codecs) {
+            try {
+                const s = await VideoEncoder.isConfigSupported({
+                    codec: c, width: REEL_WIDTH, height: REEL_HEIGHT,
+                    bitrate: REEL_BITRATE, framerate: REEL_FPS
+                });
+                if (s.supported) { codec = c; break; }
+            } catch (e) { /* try next */ }
+        }
+
+        const muxer = new Mp4Muxer.Muxer({
+            target: new Mp4Muxer.ArrayBufferTarget(),
+            video: { codec: 'avc', width: REEL_WIDTH, height: REEL_HEIGHT },
+            fastStart: 'in-memory'
+        });
+
+        let encErr = false;
+        const enc = new VideoEncoder({
+            output: (chunk, meta) => { if (!encErr) muxer.addVideoChunk(chunk, meta); },
+            error: (e) => { encErr = true; alert('Encoding error: ' + e.message); }
+        });
+        enc.configure({
+            codec,
+            width: REEL_WIDTH, height: REEL_HEIGHT,
+            bitrate: REEL_BITRATE,
+            framerate: REEL_FPS,
+            bitrateMode: 'constant',   // force target bitrate
+            latencyMode: 'quality',    // best quality — fine for offline rendering
+            hardwareAcceleration: 'prefer-hardware'
+        });
+
+        // Motion-blur accumulation canvas (optional)
+        let accumCanvas = null, accumCtx = null;
+        if (mbSamples > 0) {
+            accumCanvas = document.createElement('canvas');
+            accumCanvas.width = REEL_WIDTH; accumCanvas.height = REEL_HEIGHT;
+            accumCtx = accumCanvas.getContext('2d', { willReadFrequently: false });
+            accumCtx.imageSmoothingEnabled = false;
+        }
+
+        // Inline render helper that uses the dedicated exportRenderer
+        const renderFrame = () => {
+            exportRenderer.clear();
+            exportRenderer.render(scene, camera);
+            if (_wmScene && _wmCamera) {
+                exportRenderer.clearDepth();
+                exportRenderer.render(_wmScene, _wmCamera);
+            }
+            exportRenderer.getContext().flush();
+        };
+
+        for (let i = 0; i <= totalFrames && !encErr; i++) {
+            const base = i / totalFrames;
+            const progress = (loop === 'pingpong')
+                ? (base <= 0.5 ? base * 2 : 2 - base * 2)
+                : base;
+
+            if (mbSamples > 0) {
+                accumCtx.clearRect(0, 0, REEL_WIDTH, REEL_HEIGHT);
+                accumCtx.globalAlpha = 1.0 / mbSamples;
+                accumCtx.globalCompositeOperation = 'lighter';
+                for (let s = 0; s < mbSamples; s++) {
+                    const sub = Math.max(0, Math.min(1, progress + (s / mbSamples - 0.5) * (1 / totalFrames) * 0.8));
+                    applyCinemaState(sub, curve, segs, totalDur);
+                    renderFrame();
+                    accumCtx.drawImage(exportRenderer.domElement, 0, 0);
+                }
+                const f = new VideoFrame(accumCanvas, { timestamp: Math.round(i * 1e6 / REEL_FPS), alpha: 'discard' });
+                enc.encode(f, { keyFrame: i % kfInterval === 0 }); f.close();
+            } else {
+                applyCinemaState(progress, curve, segs, totalDur);
+                renderFrame();
+                const f = new VideoFrame(exportRenderer.domElement, { timestamp: Math.round(i * 1e6 / REEL_FPS), alpha: 'discard' });
+                enc.encode(f, { keyFrame: i % kfInterval === 0 }); f.close();
+            }
+
+            // Keep encoder queue shallow to avoid OOM on long exports
+            while (enc.encodeQueueSize >= 2) await new Promise(r => setTimeout(r, 10));
+
+            if (i % 3 === 0 || i === totalFrames) {
+                const pct = Math.round((i / totalFrames) * 100);
+                document.getElementById('render-progress-bar').style.width = `${pct}%`;
+                document.getElementById('render-progress-pct').textContent = `${pct}%`;
+                document.getElementById('render-status-text').textContent =
+                    `Rendering frame ${i} / ${totalFrames} (${pct}%) · 4K 9:16 · ${codec}`;
+            }
+            await new Promise(r => setTimeout(r, 0));
+        }
+
+        if (!encErr) {
+            document.getElementById('render-status-text').textContent = 'Finalizing MP4…';
+            await enc.flush();
+            enc.close();
+            muxer.finalize();
+
+            const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.style.display = 'none';
+            a.href     = url;
+            a.download = `DEM3D_4K_Reel_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp4`;
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+        }
+
+        // Always restore state
+        scene.fog = prevFog;
+        camera.aspect = prevAspect;
+        camera.updateProjectionMatrix();
+        exportRenderer.dispose();
+        disposeWatermark();
+        isReelRendering = false;
+        document.getElementById('render-overlay').style.display = 'none';
+        document.getElementById('btn-render-reel').disabled = cinemaKeyframes.length < 2;
+    }
+
+    // --- Wire up Cinema UI events ---
+    function setupCinemaEvents() {
+        document.getElementById('btn-open-cinema').addEventListener('click', enterCinemaMode);
+        document.getElementById('btn-exit-cinema').addEventListener('click', exitCinemaMode);
+        document.getElementById('btn-add-kf').addEventListener('click', addCinemaKeyframe);
+        document.getElementById('btn-clear-kf').addEventListener('click', () => { cinemaKeyframes.length = 0; updateKfUI(); });
+        document.getElementById('btn-preview-kf').addEventListener('click', startCinemaPreview);
+        document.getElementById('btn-render-reel').addEventListener('click', startReelExport);
+        document.getElementById('cp-pace').addEventListener('input', updateKfTotalTime);
+        document.getElementById('cp-duration').addEventListener('input', updateKfTotalTime);
+        document.getElementById('cp-loop').addEventListener('change', updateKfTotalTime);
+    }
+
     function animate() {
         requestAnimationFrame(animate);
+
+        if (isReelRendering) return;
+
+        // Cinema preview playback
+        if (isCinemaPreview && _cinemaCurve) {
+            const elapsed    = performance.now() - cinemaPreviewStart;
+            const rawProgress = Math.min(elapsed / cinemaPreviewDuration, 1.0);
+            const loop       = document.getElementById('cp-loop').value;
+            const progress   = (loop === 'pingpong')
+                ? (rawProgress <= 0.5 ? rawProgress * 2 : 2 - rawProgress * 2)
+                : rawProgress;
+
+            const { segs, total } = getSegmentTimes();
+            applyCinemaState(progress, _cinemaCurve, segs, total);
+            renderer.render(scene, camera);
+
+            if (rawProgress >= 1.0) {
+                if (loop === 'loop') cinemaPreviewStart = performance.now();
+                else isCinemaPreview = false;
+            }
+            return;
+        }
+
         const time = performance.now();
         let delta = (time - prevTime) / 1000;
-        delta = Math.min(delta, 0.1); 
-        
+        delta = Math.min(delta, 0.1);
+
         if (flightMode) {
             // Flight mode physics - no gravity, full 3D movement
             velocity.x -= velocity.x * 8.0 * delta;

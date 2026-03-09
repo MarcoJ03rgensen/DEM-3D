@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4K Instagram 3D Studio Pro</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #0a0a0a;
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: white;
+        }
+        
+        #app-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-image: radial-gradient(circle at center, #2a2a2a 0%, #000000 100%);
+        }
+
+        #canvas-wrapper {
+            position: relative;
+            height: 95vh;
+            aspect-ratio: 9 / 16;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #e6e6ea;
+        }
+
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            outline: none;
+        }
+
+        #ui {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(25, 25, 25, 0.85);
+            padding: 12px 20px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            width: max-content;
+            max-width: 90vw;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(220, 39, 67, 0.4);
+            white-space: nowrap;
+        }
+
+        button:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(220, 39, 67, 0.6); }
+        button:disabled { background: #555; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        button.secondary { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255,255,255,0.3); box-shadow: none; }
+        button.secondary:hover { background: rgba(255, 255, 255, 0.2); box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2); }
+
+        .panel {
+            position: absolute;
+            top: 20px;
+            background: rgba(20, 20, 20, 0.92);
+            padding: 16px;
+            border-radius: 16px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.08);
+            z-index: 10;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+        }
+        .panel::-webkit-scrollbar { width: 4px; }
+        .panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+        #planner { right: 20px; width: 320px; }
+        #settings { left: 20px; width: 280px; }
+        #camera-panel { left: 310px; width: 260px; }
+
+        .panel-title {
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.5;
+            margin: 12px 0 6px 0;
+        }
+
+        #kf-list { max-height: 220px; overflow-y: auto; margin-bottom: 10px; font-size: 12px; }
+        #kf-list::-webkit-scrollbar { width: 3px; }
+        #kf-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+        .kf-item { 
+            background: rgba(255,255,255,0.05); 
+            padding: 8px 10px; 
+            border-radius: 8px; 
+            margin-bottom: 4px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            transition: background 0.15s;
+        }
+        .kf-item:hover { background: rgba(255,255,255,0.1); }
+        .kf-item .kf-label { font-weight: 500; }
+        .kf-item .kf-meta { font-size: 11px; opacity: 0.5; }
+        .kf-item .kf-actions { display: flex; gap: 6px; align-items: center; }
+        .kf-item .kf-actions span { 
+            cursor: pointer; opacity: 0.6; transition: opacity 0.15s; font-size: 14px;
+        }
+        .kf-item .kf-actions span:hover { opacity: 1; }
+        
+        .planner-btn {
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); padding: 7px 10px;
+            font-size: 12px; border-radius: 8px; width: 100%; margin-bottom: 6px; color: white; cursor: pointer; transition: 0.2s;
+        }
+        .planner-btn:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
+        .planner-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .setting-row {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+            font-size: 12px; opacity: 0.9;
+        }
+        
+        .setting-row select, .setting-row input[type="color"] {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: white;
+            border-radius: 6px; padding: 4px 6px; width: 115px; cursor: pointer; font-size: 11px;
+        }
+        .setting-row select option { background: #222; color: white; }
+
+        .setting-row input[type="range"] { width: 115px; cursor: pointer; accent-color: #dc2743; }
+        .setting-row input[type="number"] {
+            width: 60px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+            color: white; border-radius: 6px; padding: 4px 6px; text-align: center; font-size: 11px;
+        }
+        .setting-row input[type="text"] {
+            width: 115px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+            color: white; border-radius: 6px; padding: 4px 6px; font-family: inherit; font-size: 11px;
+        }
+
+        .inline-row { display: flex; gap: 6px; align-items: center; }
+        .inline-row input[type="number"] { width: 50px; }
+
+        .cam-btn-grid { 
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 10px; 
+        }
+        .cam-btn {
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); 
+            padding: 6px 4px; font-size: 11px; border-radius: 6px; color: white; 
+            cursor: pointer; transition: 0.15s; text-align: center;
+        }
+        .cam-btn:hover { background: rgba(255,255,255,0.2); }
+
+        .zoom-preset-row {
+            display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px;
+        }
+        .zoom-btn {
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+            padding: 5px 10px; font-size: 11px; border-radius: 20px; color: white;
+            cursor: pointer; transition: 0.15s; flex: 1; text-align: center; min-width: 50px;
+        }
+        .zoom-btn:hover { background: rgba(100,180,255,0.25); border-color: rgba(100,180,255,0.4); }
+
+        #status { font-weight: 500; font-size: 13px; text-align: center; }
+        .controls-hint { font-size: 11px; opacity: 0.5; margin-top: 3px; text-align: center; }
+
+        #loading-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85); color: white; display: none;
+            justify-content: center; align-items: center; font-size: 18px; z-index: 20;
+            transition: opacity 0.5s; flex-direction: column; gap: 12px;
+        }
+
+        .progress-bar-container { width: 60%; height: 8px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; display: none; }
+        #render-progress { width: 0%; height: 100%; background: linear-gradient(90deg, #f09433, #dc2743, #bc1888); transition: width 0.1s; }
+
+        .kf-dur-input {
+            width: 38px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: white; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 11px;
+        }
+
+        .total-time-display {
+            background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 8px; 
+            text-align: center; font-size: 13px; margin-bottom: 10px; font-variant-numeric: tabular-nums;
+        }
+        .total-time-display .big { font-size: 20px; font-weight: 700; }
+
+        /* Animated focus ring */
+        #focus-ring {
+            position: absolute; pointer-events: none; border: 2px solid rgba(255,255,255,0.8);
+            border-radius: 50%; width: 40px; height: 40px; transform: translate(-50%, -50%) scale(1.5);
+            opacity: 0; transition: all 0.3s ease; z-index: 15;
+            box-shadow: 0 0 15px rgba(255,255,255,0.3);
+        }
+        #focus-ring.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        #focus-ring.shrink { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="canvas-wrapper">
+            <div id="focus-ring"></div>
+            <div id="loading-overlay">
+                <span id="overlay-text">Waiting for 3D Model...</span>
+                <div class="progress-bar-container" id="progress-container">
+                    <div id="render-progress"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="ui">
+            <input type="file" id="fileInput" accept=".glb,.gltf" style="display: none;">
+            <button id="uploadBtn" class="secondary">📁 Load Model</button>
+            <button id="recordBtn" disabled>Waiting for Model...</button>
+            <div id="status-container">
+                <div id="status">Please load a 3D model to begin.</div>
+                <div class="controls-hint">Drag: Rotate &bull; Right-Click: Pan &bull; Scroll: Zoom &bull; Double-Click: Focus</div>
+            </div>
+        </div>
+
+        <!-- SETTINGS PANEL -->
+        <div id="settings" class="panel">
+            <div class="panel-title">⚙️ Visual Settings</div>
+            <div class="setting-row">
+                <label>Background</label>
+                <select id="bgSelect">
+                    <option value="dark">Dark Studio</option>
+                    <option value="light">Light Studio</option>
+                    <option value="greenscreen">Green Screen</option>
+                    <option value="custom">Solid Color</option>
+                </select>
+            </div>
+            <div class="setting-row" id="customColorRow" style="display: none;">
+                <label>Color Picker</label>
+                <input type="color" id="bgColorPicker" value="#1a1a1a">
+            </div>
+            <div class="setting-row">
+                <label>Render Style</label>
+                <select id="renderStyle">
+                    <option value="polycam">Polycam (Raw Colors)</option>
+                    <option value="studio">Cinematic Studio</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <label>Floor Shadow</label>
+                <input type="range" id="shadowSlider" min="0" max="1" step="0.1" value="0.3">
+            </div>
+            <div class="setting-row">
+                <label>Watermark</label>
+                <input type="text" id="watermarkInput" value="@the_danish_archaeologist">
+            </div>
+
+            <div class="setting-row">
+                <label>Export Quality</label>
+                <span style="font-size:12px; opacity:0.7;">Maximum • 60fps • 300Mbps</span>
+            </div>
+            <div class="setting-row">
+                <label>Motion Blur</label>
+                <select id="motionBlurSelect">
+                    <option value="0" selected>Off</option>
+                    <option value="4">Subtle (4 samples)</option>
+                    <option value="8">Medium (8 samples)</option>
+                    <option value="16">Heavy (16 samples)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- CAMERA PANEL -->
+        <div id="camera-panel" class="panel">
+            <div class="panel-title">📷 Camera Control</div>
+            
+            <div class="section-label">Quick Views</div>
+            <div class="cam-btn-grid">
+                <div class="cam-btn" onclick="snapCamera('front')">Front</div>
+                <div class="cam-btn" onclick="snapCamera('back')">Back</div>
+                <div class="cam-btn" onclick="snapCamera('left')">Left</div>
+                <div class="cam-btn" onclick="snapCamera('right')">Right</div>
+                <div class="cam-btn" onclick="snapCamera('top')">Top</div>
+                <div class="cam-btn" onclick="snapCamera('angle')">3/4 View</div>
+            </div>
+
+            <div class="section-label">Zoom Presets</div>
+            <div class="zoom-preset-row">
+                <div class="zoom-btn" onclick="zoomPreset(0.4)">Macro</div>
+                <div class="zoom-btn" onclick="zoomPreset(0.8)">Close</div>
+                <div class="zoom-btn" onclick="zoomPreset(1.5)">Medium</div>
+                <div class="zoom-btn" onclick="zoomPreset(2.5)">Wide</div>
+                <div class="zoom-btn" onclick="zoomPreset(4.0)">Ultra</div>
+            </div>
+
+            <div class="section-label">Field of View</div>
+            <div class="setting-row">
+                <label>FOV: <span id="fovValue">35</span>°</label>
+                <input type="range" id="fovSlider" min="10" max="120" step="1" value="35">
+            </div>
+
+            <div class="section-label">Orbit Speed</div>
+            <div class="setting-row">
+                <label>Sensitivity</label>
+                <input type="range" id="sensitivitySlider" min="0.2" max="3" step="0.1" value="1">
+            </div>
+
+            <div class="setting-row">
+                <label>Damping</label>
+                <input type="range" id="dampingSlider" min="0.01" max="0.2" step="0.01" value="0.05">
+            </div>
+
+            <button class="planner-btn" onclick="resetCamera()" style="margin-top: 6px;">↩ Reset Camera</button>
+        </div>
+
+        <!-- SHOT PLANNER PANEL -->
+        <div id="planner" class="panel">
+            <div class="panel-title">
+                🎥 Shot Planner
+                <span id="kf-count" style="font-size:11px; opacity:0.5;">0 keyframes</span>
+            </div>
+
+            <div class="total-time-display">
+                Total Duration: <span class="big" id="totalTimeDisplay">0.0</span>s
+                <span id="totalFramesDisplay" style="font-size:11px; opacity:0.5; display:block;">0 frames</span>
+            </div>
+
+            <div class="setting-row">
+                <label>Default secs/transition</label>
+                <input type="number" id="durationInput" value="3.0" step="0.5" min="0.5" max="60" style="width: 60px;">
+            </div>
+            <div class="setting-row">
+                <label>Global Easing</label>
+                <select id="globalEasing" style="width: 130px;">
+                    <option value="linear">Linear</option>
+                    <option value="easeIn">Ease In (Slow Start)</option>
+                    <option value="easeOut">Ease Out (Slow End)</option>
+                    <option value="easeInOut">Ease In-Out</option>
+                    <option value="smootherstep" selected>Smootherstep (Drone)</option>
+                    <option value="cinematic">Cinematic (Slow-Fast-Slow)</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <label>Pace Multiplier</label>
+                <div class="inline-row">
+                    <input type="range" id="paceSlider" min="0.25" max="4" step="0.25" value="1" style="width:80px;">
+                    <span id="paceValue" style="font-size:11px; width:30px; text-align:right;">1.0x</span>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label>Loop Animation</label>
+                <select id="loopSelect" style="width:100px;">
+                    <option value="none">No Loop</option>
+                    <option value="loop">Loop</option>
+                    <option value="pingpong">Ping-Pong</option>
+                </select>
+            </div>
+
+            <div id="kf-list">
+                <div style="opacity:0.5; text-align:center; padding: 10px; font-size: 12px;">Position camera, then add keyframe.<br>Need at least 2 for a sweep.</div>
+            </div>
+            <button id="addKfBtn" class="planner-btn" disabled>+ Add Current View as Keyframe</button>
+            <div style="display:flex; gap:6px;">
+                <button id="previewBtn" class="planner-btn" disabled>▶ Preview</button>
+                <button id="clearKfBtn" class="planner-btn" disabled>✕ Clear All</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/mp4-muxer@3.0.0/build/mp4-muxer.js"></script>
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+        import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+        import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+        // Export resolution (only used during render)
+        const EXPORT_WIDTH = 2160;
+        const EXPORT_HEIGHT = 3840;
+        // Preview resolution (used for interactive viewing — much lighter on memory)
+        const PREVIEW_WIDTH = 540;
+        const PREVIEW_HEIGHT = 960;
+        // Active resolution (switches between preview/export)
+        let WIDTH = PREVIEW_WIDTH;
+        let HEIGHT = PREVIEW_HEIGHT;
+
+        // =============================================
+        //  EXPORT QUALITY (Maximum)
+        // =============================================
+        const EXPORT_QUALITY = { fps: 60, bitrate: 300_000_000, label: 'Maximum 4K' };
+
+        // =============================================
+        //  EASING FUNCTIONS
+        // =============================================
+        function easeLinear(x) { return x; }
+        function easeIn(x) { return x * x * x; }
+        function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
+        function easeInOut(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
+        function easeSmootherStep(x) { return x * x * x * (x * (x * 6 - 15) + 10); }
+        function easeCinematic(x) {
+            // Attempt a slow-fast-slow filmic feel
+            if (x < 0.15) return easeIn(x / 0.15) * 0.15;
+            if (x > 0.85) return 0.85 + easeOut((x - 0.85) / 0.15) * 0.15;
+            return 0.15 + (x - 0.15) * (0.7 / 0.7);
+        }
+
+        const EASING_MAP = {
+            linear: easeLinear,
+            easeIn: easeIn,
+            easeOut: easeOut,
+            easeInOut: easeInOut,
+            smootherstep: easeSmootherStep,
+            cinematic: easeCinematic,
+        };
+
+        // =============================================
+        //  DOM REFERENCES
+        // =============================================
+        const wrapper = document.getElementById('canvas-wrapper');
+        const recordBtn = document.getElementById('recordBtn');
+        const statusText = document.getElementById('status');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const overlayText = document.getElementById('overlay-text');
+        const progressContainer = document.getElementById('progress-container');
+        const renderProgress = document.getElementById('render-progress');
+        const focusRing = document.getElementById('focus-ring');
+        
+        const durationInput = document.getElementById('durationInput');
+        const bgSelect = document.getElementById('bgSelect');
+        const customColorRow = document.getElementById('customColorRow');
+        const bgColorPicker = document.getElementById('bgColorPicker');
+        const renderStyle = document.getElementById('renderStyle');
+        const shadowSlider = document.getElementById('shadowSlider');
+        const fovSlider = document.getElementById('fovSlider');
+        const fovValue = document.getElementById('fovValue');
+        const sensitivitySlider = document.getElementById('sensitivitySlider');
+        const dampingSlider = document.getElementById('dampingSlider');
+        const paceSlider = document.getElementById('paceSlider');
+        const paceValue = document.getElementById('paceValue');
+        const globalEasing = document.getElementById('globalEasing');
+        const loopSelect = document.getElementById('loopSelect');
+        const motionBlurSelect = document.getElementById('motionBlurSelect');
+
+        // =============================================
+        //  SCENE SETUP
+        // =============================================
+        const scene = new THREE.Scene();
+        
+        // Use a small canvas for the gradient — GPU scales it smoothly
+        const BG_SIZE = 512;
+        let currentBgTexture = null;
+        function createRadialBackground(innerColor, outerColor) {
+            // Dispose previous background texture to free GPU memory
+            if (currentBgTexture) { currentBgTexture.dispose(); currentBgTexture = null; }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = BG_SIZE;
+            canvas.height = BG_SIZE;
+            const context = canvas.getContext('2d');
+            const cx = BG_SIZE / 2, cy = BG_SIZE / 2;
+            const outerRadius = Math.sqrt(cx * cx + cy * cy);
+            const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, outerRadius);
+            gradient.addColorStop(0, innerColor);
+            gradient.addColorStop(0.4, innerColor);
+            gradient.addColorStop(1, outerColor);
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, BG_SIZE, BG_SIZE);
+
+            // Lightweight noise dithering on small canvas
+            const imageData = context.getImageData(0, 0, BG_SIZE, BG_SIZE);
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const noise = (Math.random() - 0.5) * 3;
+                data[i]     = Math.max(0, Math.min(255, data[i] + noise));
+                data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+                data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+            }
+            context.putImageData(imageData, 0, 0);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            texture.colorSpace = THREE.SRGBColorSpace;
+            currentBgTexture = texture;
+            return texture;
+        }
+
+        function updateBackground() {
+            if (bgSelect.value === 'dark') {
+                scene.background = createRadialBackground('#3a3a44', '#0a0a0c');
+                customColorRow.style.display = 'none';
+            } else if (bgSelect.value === 'light') {
+                scene.background = createRadialBackground('#ffffff', '#caced6');
+                customColorRow.style.display = 'none';
+            } else if (bgSelect.value === 'greenscreen') {
+                // Perfect chroma key green (#00FF00) for clean keying in video editors
+                scene.background = new THREE.Color(0x00ff00);
+                customColorRow.style.display = 'none';
+            } else {
+                scene.background = new THREE.Color(bgColorPicker.value);
+                customColorRow.style.display = 'flex';
+            }
+            // Hide floor shadow on green screen so it doesn't interfere with chroma keying
+            try { floor.visible = bgSelect.value !== 'greenscreen'; } catch(e) {}
+        }
+        updateBackground();
+        bgSelect.addEventListener('change', updateBackground);
+        bgColorPicker.addEventListener('input', updateBackground);
+
+        // Camera & Renderer
+        const camera = new THREE.PerspectiveCamera(35, EXPORT_WIDTH / EXPORT_HEIGHT, 0.01, 2000);
+        camera.position.set(0, 0, 5); 
+        
+        // Start at preview resolution — only scale up during export
+        const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: false });
+        renderer.setSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
+        renderer.setPixelRatio(1);
+        renderer.toneMapping = THREE.LinearToneMapping; 
+        renderer.toneMappingExposure = 1.0;
+        renderer.outputColorSpace = THREE.SRGBColorSpace; 
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.autoClear = false; 
+        wrapper.appendChild(renderer.domElement);
+
+        const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+
+        // =============================================
+        //  MOTION BLUR ACCUMULATION BUFFER (lazy-init)
+        // =============================================
+        let accumCanvas = null;
+        let accumCtx = null;
+        function getAccumBuffer() {
+            // Create/resize to current active resolution (only full-size during export)
+            if (!accumCanvas || accumCanvas.width !== WIDTH || accumCanvas.height !== HEIGHT) {
+                accumCanvas = document.createElement('canvas');
+                accumCanvas.width = WIDTH;
+                accumCanvas.height = HEIGHT;
+                accumCtx = accumCanvas.getContext('2d', { willReadFrequently: false });
+                accumCtx.imageSmoothingEnabled = false;
+            }
+            return { accumCanvas, accumCtx };
+        }
+        function freeAccumBuffer() {
+            accumCanvas = null; accumCtx = null;
+        }
+
+        // =============================================
+        //  WATERMARK OVERLAY (HUD)
+        // =============================================
+        const watermarkScene = new THREE.Scene();
+        let watermarkCamera = new THREE.OrthographicCamera(-PREVIEW_WIDTH/2, PREVIEW_WIDTH/2, PREVIEW_HEIGHT/2, -PREVIEW_HEIGHT/2, 0, 10);
+        
+        const wmCanvas = document.createElement('canvas');
+        wmCanvas.width = PREVIEW_WIDTH;
+        wmCanvas.height = PREVIEW_HEIGHT;
+        const wmCtx = wmCanvas.getContext('2d');
+        const wmTexture = new THREE.CanvasTexture(wmCanvas);
+        const wmMaterial = new THREE.MeshBasicMaterial({ map: wmTexture, transparent: true });
+        let wmGeometry = new THREE.PlaneGeometry(PREVIEW_WIDTH, PREVIEW_HEIGHT);
+        const wmMesh = new THREE.Mesh(wmGeometry, wmMaterial);
+        wmMesh.position.set(0, 0, -1);
+        watermarkScene.add(wmMesh);
+
+        // Resize watermark system to match current WIDTH/HEIGHT
+        function resizeWatermark() {
+            wmCanvas.width = WIDTH;
+            wmCanvas.height = HEIGHT;
+            watermarkCamera = new THREE.OrthographicCamera(-WIDTH/2, WIDTH/2, HEIGHT/2, -HEIGHT/2, 0, 10);
+            wmMesh.geometry.dispose();
+            wmMesh.geometry = new THREE.PlaneGeometry(WIDTH, HEIGHT);
+            updateWatermark();
+        }
+
+        const watermarkInput = document.getElementById('watermarkInput');
+        function updateWatermark() {
+            wmCtx.clearRect(0, 0, wmCanvas.width, wmCanvas.height);
+            const text = watermarkInput.value.trim();
+            if (text) {
+                // Scale font size proportionally to canvas resolution
+                const fontSize = Math.round(70 * (wmCanvas.width / EXPORT_WIDTH));
+                const yPos = Math.round(350 * (wmCanvas.height / EXPORT_HEIGHT));
+                wmCtx.fillStyle = 'rgba(255, 255, 255, 0.4)'; 
+                wmCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+                wmCtx.textAlign = 'center';
+                wmCtx.textBaseline = 'middle';
+                wmCtx.shadowColor = 'rgba(0,0,0,0.8)';
+                wmCtx.shadowBlur = Math.round(10 * (wmCanvas.width / EXPORT_WIDTH));
+                wmCtx.shadowOffsetX = 2;
+                wmCtx.shadowOffsetY = 2;
+                wmCtx.fillText(text, wmCanvas.width / 2, yPos); 
+            }
+            wmTexture.needsUpdate = true;
+        }
+        watermarkInput.addEventListener('input', updateWatermark);
+        updateWatermark(); 
+
+        // =============================================
+        //  LIGHTING
+        // =============================================
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        const roomEnvironmentTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+        scene.environment = null;
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, parseFloat(shadowSlider.value));
+        keyLight.position.set(5, 10, 5);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 1024; 
+        keyLight.shadow.mapSize.height = 1024;
+        keyLight.shadow.bias = -0.0001;
+        scene.add(keyLight);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambientLight);
+
+        const floorGeometry = new THREE.PlaneGeometry(100, 100);
+        const floorMaterial = new THREE.ShadowMaterial({ opacity: 0.5 });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // =============================================
+        //  CONTROLS
+        // =============================================
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        const pivot = new THREE.Group();
+        scene.add(pivot);
+
+        // --- FOV Control ---
+        fovSlider.addEventListener('input', () => {
+            const v = parseFloat(fovSlider.value);
+            camera.fov = v;
+            camera.updateProjectionMatrix();
+            fovValue.textContent = v;
+        });
+
+        // --- Sensitivity Control ---
+        sensitivitySlider.addEventListener('input', () => {
+            controls.rotateSpeed = parseFloat(sensitivitySlider.value);
+        });
+
+        // --- Damping Control ---
+        dampingSlider.addEventListener('input', () => {
+            controls.dampingFactor = parseFloat(dampingSlider.value);
+        });
+
+        // --- Pace slider display ---
+        paceSlider.addEventListener('input', () => {
+            paceValue.textContent = parseFloat(paceSlider.value).toFixed(2) + 'x';
+            updateTotalTime();
+        });
+        durationInput.addEventListener('input', updateTotalTime);
+
+        // =============================================
+        //  MODEL LOADING
+        // =============================================
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
+        const ktx2Loader = new KTX2Loader();
+        ktx2Loader.setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/basis/');
+        ktx2Loader.detectSupport(renderer);
+
+        const loader = new GLTFLoader();
+        loader.setDRACOLoader(dracoLoader);
+        loader.setKTX2Loader(ktx2Loader);
+        loader.setMeshoptDecoder(MeshoptDecoder);
+
+        let model;
+        let modelSize = 1;
+
+        // Helper: safely apply PBR props to a single material
+        function applyMatProps(mat, userData, style) {
+            if (!mat || mat.type === 'MeshBasicMaterial' || mat.type === 'ShaderMaterial') return;
+            if (style === 'polycam') {
+                if ('envMapIntensity' in mat) mat.envMapIntensity = 0.0;
+                // Only flatten PBR if the model has NO roughness/metalness maps
+                if (!mat.roughnessMap) mat.roughness = 1.0;
+                if (!mat.metalnessMap) mat.metalness = 0.0;
+            } else {
+                if ('envMapIntensity' in mat) mat.envMapIntensity = 1.0;
+                mat.roughness = userData.origRoughness ?? mat.roughness ?? 0.5;
+                mat.metalness = userData.origMetalness ?? mat.metalness ?? 0.0;
+            }
+            mat.needsUpdate = true;
+        }
+
+        function applyRenderStyle() {
+            const style = renderStyle.value;
+            const shadowVal = parseFloat(shadowSlider.value);
+
+            if (style === 'polycam') {
+                renderer.toneMapping = THREE.LinearToneMapping;
+                renderer.toneMappingExposure = 1.0;
+                scene.environment = null;
+                ambientLight.intensity = 1.0; 
+                keyLight.intensity = shadowVal; 
+            } else {
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 1.0;
+                scene.environment = roomEnvironmentTexture;
+                ambientLight.intensity = 0.2;
+                keyLight.intensity = shadowVal + 0.5;
+            }
+
+            if (model) {
+                model.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach(m => applyMatProps(m, child.userData, style));
+                    }
+                });
+            }
+        }
+
+        renderStyle.addEventListener('change', applyRenderStyle);
+        shadowSlider.addEventListener('input', applyRenderStyle);
+
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        uploadBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            loadModelFromUrl(URL.createObjectURL(file), true);
+            event.target.value = '';
+        });
+
+        let initialCameraPos = new THREE.Vector3(0, 0, 5);
+        let initialCameraTarget = new THREE.Vector3(0, 0, 0);
+
+        function loadModelFromUrl(url, isObjectURL = false) {
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.style.opacity = '1';
+            overlayText.innerText = "Loading Model...";
+            progressContainer.style.display = 'none';
+            recordBtn.disabled = true;
+            document.getElementById('addKfBtn').disabled = true;
+            
+            if (model) {
+                pivot.remove(model);
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.geometry.dispose();
+                        if (child.material) {
+                            const disposeMat = (m) => {
+                                m.dispose();
+                                ['map', 'lightMap', 'bumpMap', 'normalMap', 'specularMap', 'envMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap'].forEach(key => {
+                                    if (m[key]) m[key].dispose();
+                                });
+                            };
+                            if (Array.isArray(child.material)) child.material.forEach(disposeMat);
+                            else disposeMat(child.material);
+                        }
+                    }
+                });
+                model = null;
+            }
+
+            loader.load(url, (gltf) => {
+                model = gltf.scene;
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3());
+                const center = box.getCenter(new THREE.Vector3());
+                
+                model.position.x += (model.position.x - center.x);
+                model.position.y += (model.position.y - center.y);
+                model.position.z += (model.position.z - center.z);
+                pivot.add(model);
+                
+                const maxDim = Math.max(size.x, size.y, size.z);
+                modelSize = maxDim;
+                camera.position.set(0, maxDim * 0.5, maxDim * 2.5);
+                controls.target.set(0, 0, 0);
+                controls.update();
+
+                initialCameraPos.copy(camera.position);
+                initialCameraTarget.set(0, 0, 0);
+                
+                floor.position.y = -(size.y / 2);
+
+                keyLight.shadow.camera.near = 0.1;
+                keyLight.shadow.camera.far = maxDim * 10;
+                keyLight.shadow.camera.left = -maxDim;
+                keyLight.shadow.camera.right = maxDim;
+                keyLight.shadow.camera.top = maxDim;
+                keyLight.shadow.camera.bottom = -maxDim;
+                keyLight.shadow.camera.updateProjectionMatrix();
+
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        if (child.material) {
+                            const mats = Array.isArray(child.material) ? child.material : [child.material];
+                            mats.forEach(m => {
+                                // Backup originals
+                                child.userData.origRoughness = m.roughness;
+                                child.userData.origMetalness = m.metalness;
+                                // High-quality texture filtering (only if props exist)
+                                if (m.map) {
+                                    m.map.anisotropy = maxAnisotropy;
+                                    m.map.colorSpace = THREE.SRGBColorSpace;
+                                }
+                                if (m.normalMap) m.normalMap.anisotropy = maxAnisotropy;
+                                // Ensure emissive map colorSpace
+                                if (m.emissiveMap) m.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+                            });
+                        }
+                    }
+                });
+
+                applyRenderStyle();
+                
+                loadingOverlay.style.opacity = '0';
+                setTimeout(() => loadingOverlay.style.display = 'none', 500);
+                
+                recordBtn.innerText = "🎬 Start Render";
+                recordBtn.disabled = false;
+                document.getElementById('addKfBtn').disabled = false;
+                statusText.innerText = "Frame your shot, then click render.";
+            }, undefined, (error) => {
+                console.error("GLTFLoader Error:", error);
+                overlayText.innerText = "Error loading model.";
+                setTimeout(() => loadingOverlay.style.display = 'none', 4000);
+            });
+        }
+
+        // =============================================
+        //  CAMERA SNAP VIEWS (Smooth Animated)
+        // =============================================
+        let cameraAnimating = false;
+        let camAnimStart = 0;
+        let camAnimDuration = 600;
+        let camAnimFromPos = new THREE.Vector3();
+        let camAnimToPos = new THREE.Vector3();
+        let camAnimFromTarget = new THREE.Vector3();
+        let camAnimToTarget = new THREE.Vector3();
+
+        function animateCameraTo(pos, target, duration = 600) {
+            camAnimFromPos.copy(camera.position);
+            camAnimToPos.copy(pos);
+            camAnimFromTarget.copy(controls.target);
+            camAnimToTarget.copy(target);
+            camAnimStart = performance.now();
+            camAnimDuration = duration;
+            cameraAnimating = true;
+            controls.enabled = false;
+        }
+
+        window.snapCamera = function(view) {
+            if (!model) return;
+            const d = modelSize * 2.5;
+            const target = new THREE.Vector3(0, 0, 0);
+            let pos;
+            switch (view) {
+                case 'front':  pos = new THREE.Vector3(0, 0, d); break;
+                case 'back':   pos = new THREE.Vector3(0, 0, -d); break;
+                case 'left':   pos = new THREE.Vector3(-d, 0, 0); break;
+                case 'right':  pos = new THREE.Vector3(d, 0, 0); break;
+                case 'top':    pos = new THREE.Vector3(0, d, 0.01); break;
+                case 'angle':  pos = new THREE.Vector3(d * 0.7, d * 0.5, d * 0.7); break;
+                default: return;
+            }
+            animateCameraTo(pos, target);
+        };
+
+        window.zoomPreset = function(multiplier) {
+            if (!model) return;
+            const dir = camera.position.clone().sub(controls.target).normalize();
+            const newPos = controls.target.clone().add(dir.multiplyScalar(modelSize * multiplier));
+            animateCameraTo(newPos, controls.target.clone());
+        };
+
+        window.resetCamera = function() {
+            if (!model) return;
+            animateCameraTo(initialCameraPos.clone(), initialCameraTarget.clone());
+            fovSlider.value = 35;
+            fovValue.textContent = '35';
+            camera.fov = 35;
+            camera.updateProjectionMatrix();
+        };
+
+        // =============================================
+        //  DOUBLE-CLICK TO FOCUS ON POINT
+        // =============================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        renderer.domElement.addEventListener('dblclick', (event) => {
+            if (!model || isRenderingOffline || isPreviewing) return;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(pivot, true);
+
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                
+                // Show focus ring animation
+                focusRing.style.left = event.clientX - wrapper.getBoundingClientRect().left + 'px';
+                focusRing.style.top = event.clientY - wrapper.getBoundingClientRect().top + 'px';
+                focusRing.classList.remove('shrink');
+                focusRing.classList.add('active');
+                setTimeout(() => { focusRing.classList.add('shrink'); focusRing.classList.remove('active'); }, 400);
+                setTimeout(() => { focusRing.classList.remove('shrink'); }, 700);
+
+                // Smoothly move camera to focus on clicked point
+                const dir = camera.position.clone().sub(point).normalize();
+                const distance = Math.max(modelSize * 0.6, camera.position.distanceTo(point) * 0.5);
+                const newPos = point.clone().add(dir.multiplyScalar(distance));
+                animateCameraTo(newPos, point);
+            }
+        });
+
+        // =============================================
+        //  KEYFRAME SYSTEM
+        // =============================================
+        const keyframes = [];
+        let cpCurve = null;
+        let ctCurve = null;
+
+        function updateTotalTime() {
+            const pace = parseFloat(paceSlider.value) || 1;
+            const preset = EXPORT_QUALITY;
+            let totalSec = 0;
+            
+            if (keyframes.length >= 2) {
+                for (let i = 1; i < keyframes.length; i++) {
+                    totalSec += (keyframes[i].duration || parseFloat(durationInput.value)) / pace;
+                }
+            } else {
+                totalSec = parseFloat(durationInput.value) / pace;
+            }
+
+            const loopMode = loopSelect.value;
+            let displaySec = totalSec;
+            if (loopMode === 'pingpong') displaySec = totalSec * 2;
+
+            document.getElementById('totalTimeDisplay').textContent = displaySec.toFixed(1);
+            document.getElementById('totalFramesDisplay').textContent = 
+                `${Math.ceil(displaySec * preset.fps)} frames @ ${preset.fps}fps \u2022 ${(preset.bitrate / 1e6).toFixed(0)}Mbps`;
+        }
+
+        function updatePlannerUI() {
+            document.getElementById('kf-count').innerText = `${keyframes.length} keyframes`;
+            const list = document.getElementById('kf-list');
+            if (keyframes.length === 0) {
+                list.innerHTML = '<div style="opacity:0.5; text-align:center; padding: 10px; font-size:12px;">Position camera, then add keyframe.<br>Need at least 2 for a sweep.</div>';
+                document.getElementById('previewBtn').disabled = true;
+                document.getElementById('clearKfBtn').disabled = true;
+            } else {
+                list.innerHTML = '';
+                keyframes.forEach((kf, i) => {
+                    const el = document.createElement('div');
+                    el.className = 'kf-item';
+                    const durVal = kf.duration || parseFloat(durationInput.value);
+                    el.innerHTML = `
+                        <div>
+                            <div class="kf-label">KF ${i + 1} <span class="kf-meta">FOV ${kf.fov}\u00b0</span></div>
+                            ${i > 0 ? `<div class="kf-meta" style="margin-top:2px;">
+                                <input type="number" class="kf-dur-input" value="${durVal}" step="0.5" min="0.5" max="60" 
+                                       onchange="updateKfDuration(${i}, this.value)">s transition
+                            </div>` : '<div class="kf-meta">Start</div>'}
+                        </div>
+                        <div class="kf-actions">
+                            <span title="Go to this view" onclick="gotoKf(${i})">👁️</span>
+                            <span title="Update with current view" onclick="updateKf(${i})">🔄</span>
+                            <span title="Delete" onclick="deleteKf(${i})">🗑️</span>
+                        </div>`;
+                    list.appendChild(el);
+                });
+                document.getElementById('previewBtn').disabled = keyframes.length < 2;
+                document.getElementById('clearKfBtn').disabled = false;
+            }
+            updateTotalTime();
+        }
+        
+        window.gotoKf = function(index) {
+            if (!keyframes[index]) return;
+            animateCameraTo(keyframes[index].cp.clone(), keyframes[index].ct.clone(), 400);
+            const kf = keyframes[index];
+            fovSlider.value = kf.fov;
+            fovValue.textContent = kf.fov;
+            camera.fov = kf.fov;
+            camera.updateProjectionMatrix();
+        };
+
+        window.updateKf = function(index) {
+            if (!keyframes[index]) return;
+            keyframes[index].cp = camera.position.clone();
+            keyframes[index].ct = controls.target.clone();
+            keyframes[index].fov = camera.fov;
+            updatePlannerUI();
+        };
+
+        window.deleteKf = function(index) {
+            keyframes.splice(index, 1);
+            updatePlannerUI();
+        };
+
+        window.updateKfDuration = function(index, value) {
+            if (!keyframes[index]) return;
+            keyframes[index].duration = parseFloat(value) || parseFloat(durationInput.value);
+            updateTotalTime();
+        };
+
+        document.getElementById('addKfBtn').addEventListener('click', () => {
+            keyframes.push({ 
+                cp: camera.position.clone(), 
+                ct: controls.target.clone(),
+                fov: camera.fov,
+                duration: parseFloat(durationInput.value),
+            });
+            updatePlannerUI();
+        });
+
+        document.getElementById('clearKfBtn').addEventListener('click', () => {
+            keyframes.length = 0;
+            updatePlannerUI();
+        });
+
+        loopSelect.addEventListener('change', updateTotalTime);
+        globalEasing.addEventListener('change', updateTotalTime);
+
+        function setupCurves() {
+            if (keyframes.length < 2) return;
+            cpCurve = new THREE.CatmullRomCurve3(keyframes.map(k => k.cp));
+            ctCurve = new THREE.CatmullRomCurve3(keyframes.map(k => k.ct));
+            cpCurve.curveType = 'centripetal';
+            ctCurve.curveType = 'centripetal';
+        }
+
+        // Compute segmented time - each keyframe pair can have different duration
+        function getSegmentTimes() {
+            const pace = parseFloat(paceSlider.value) || 1;
+            const times = [];
+            let total = 0;
+            for (let i = 1; i < keyframes.length; i++) {
+                const dur = (keyframes[i].duration || parseFloat(durationInput.value)) / pace;
+                times.push({ start: total, duration: dur });
+                total += dur;
+            }
+            return { segments: times, totalDuration: total };
+        }
+
+        // Map global time (0..1) to eased curve parameter
+        function getSegmentProgress(globalT, segments, totalDuration) {
+            const timePos = globalT * totalDuration;
+            let seg = 0;
+            for (let i = 0; i < segments.length; i++) {
+                if (timePos >= segments[i].start && timePos <= segments[i].start + segments[i].duration) {
+                    seg = i;
+                    break;
+                }
+                if (i === segments.length - 1) seg = i;
+            }
+            const localT = Math.max(0, Math.min(1, (timePos - segments[seg].start) / segments[seg].duration));
+            const easingFn = EASING_MAP[globalEasing.value] || easeSmootherStep;
+            const easedT = easingFn(localT);
+            
+            const segCount = keyframes.length - 1;
+            const curveT = (seg + easedT) / segCount;
+            return { curveT: Math.max(0, Math.min(1, curveT)), segIndex: seg, localT: easedT };
+        }
+
+        // Interpolate FOV between keyframes
+        function getFovAtProgress(segIndex, localT) {
+            const fovA = keyframes[segIndex].fov;
+            const fovB = keyframes[Math.min(segIndex + 1, keyframes.length - 1)].fov;
+            return fovA + (fovB - fovA) * localT;
+        }
+
+        // =============================================
+        //  LIVE PREVIEW
+        // =============================================
+        let isPreviewing = false;
+        let previewStartTime = 0;
+        let previewDuration = 0;
+
+        document.getElementById('previewBtn').addEventListener('click', () => {
+            if (keyframes.length < 2) return;
+            setupCurves();
+            isPreviewing = true;
+            controls.enabled = false;
+            
+            const segData = getSegmentTimes();
+            let dur = segData.totalDuration;
+            if (loopSelect.value === 'pingpong') dur *= 2;
+            previewDuration = dur * 1000;
+            previewStartTime = performance.now();
+        });
+
+        // =============================================
+        //  SET CAMERA FOR A GIVEN PROGRESS (0..1)
+        // =============================================
+        function setCameraForProgress(progress) {
+            if (keyframes.length < 2) return;
+
+            const segData = getSegmentTimes();
+            const { curveT, segIndex, localT } = getSegmentProgress(progress, segData.segments, segData.totalDuration);
+
+            const tPos = (cpCurve.getLength() > 0) ? cpCurve.getUtoTmapping(curveT) : 0;
+            const tTar = (ctCurve.getLength() > 0) ? ctCurve.getUtoTmapping(curveT) : 0;
+            
+            camera.position.copy(cpCurve.getPoint(tPos));
+            const targetPos = ctCurve.getPoint(tTar);
+            camera.lookAt(targetPos);
+            controls.target.copy(targetPos);
+
+            // Interpolate FOV
+            const fov = getFovAtProgress(segIndex, localT);
+            camera.fov = fov;
+            camera.updateProjectionMatrix();
+        }
+
+        function renderFrame() {
+            renderer.clear();
+            renderer.render(scene, camera);
+            renderer.clearDepth();
+            renderer.render(watermarkScene, watermarkCamera);
+        }
+
+        // =============================================
+        //  OFFLINE RENDERING PIPELINE
+        // =============================================
+        let isRenderingOffline = false;
+
+        async function startOfflineRender() {
+            isRenderingOffline = true;
+            controls.enabled = false;
+            
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.style.opacity = '1';
+            progressContainer.style.display = 'block';
+            overlayText.innerText = "Preparing Render...";
+            renderProgress.style.width = '0%';
+            recordBtn.disabled = true;
+
+            // Scale UP to export resolution
+            WIDTH = EXPORT_WIDTH;
+            HEIGHT = EXPORT_HEIGHT;
+            renderer.setSize(WIDTH, HEIGHT);
+            renderer.getContext().canvas.style.width = '100%';
+            renderer.getContext().canvas.style.height = '100%';
+            // Upgrade shadow map for export quality
+            keyLight.shadow.mapSize.width = 4096;
+            keyLight.shadow.mapSize.height = 4096;
+            keyLight.shadow.map?.dispose();
+            keyLight.shadow.map = null;
+            resizeWatermark();
+
+            const preset = EXPORT_QUALITY;
+            const fps = preset.fps;
+            const bitrate = preset.bitrate;
+            const motionBlurSamples = parseInt(motionBlurSelect.value) || 0;
+            const pace = parseFloat(paceSlider.value) || 1;
+
+            let totalDurationSec;
+            if (keyframes.length >= 2) {
+                setupCurves();
+                const segData = getSegmentTimes();
+                totalDurationSec = segData.totalDuration;
+            } else {
+                totalDurationSec = parseFloat(durationInput.value) / pace;
+            }
+
+            const loopMode = loopSelect.value;
+            let renderDurationSec = totalDurationSec;
+            if (loopMode === 'pingpong') renderDurationSec = totalDurationSec * 2;
+
+            const totalFrames = Math.ceil(renderDurationSec * fps);
+
+            const muxer = new Mp4Muxer.Muxer({
+                target: new Mp4Muxer.ArrayBufferTarget(),
+                video: { codec: 'avc', width: WIDTH, height: HEIGHT },
+                fastStart: 'in-memory'
+            });
+
+            // Try best codec profiles in order: High L6.2 → High L5.2 → High L5.1 → Main L5.1
+            let codecString = 'avc1.640034'; // High Profile Level 5.2 (default)
+            const codecs = ['avc1.640040', 'avc1.64003E', 'avc1.640034', 'avc1.4D4034'];
+            for (const c of codecs) {
+                try {
+                    const support = await VideoEncoder.isConfigSupported({
+                        codec: c, width: WIDTH, height: HEIGHT, bitrate, framerate: fps
+                    });
+                    if (support.supported) { codecString = c; break; }
+                } catch (e) {}
+            }
+
+            let encoderError = false;
+            const videoEncoder = new VideoEncoder({
+                output: (chunk, meta) => { if (!encoderError) muxer.addVideoChunk(chunk, meta); },
+                error: (e) => {
+                    encoderError = true;
+                    alert("Encoding Error. Try a shorter sequence or close other apps to free memory.");
+                }
+            });
+
+            videoEncoder.configure({
+                codec: codecString, width: WIDTH, height: HEIGHT,
+                bitrate, framerate: fps, 
+                avc: { format: 'annexb' },
+                latencyMode: 'realtime',
+                hardwareAcceleration: 'prefer-hardware',
+            });
+
+            // Keyframe every 2 seconds — still high quality, but massively reduces memory pressure
+            const keyFrameInterval = fps * 2;
+
+            for (let i = 0; i <= totalFrames; i++) {
+                if (encoderError) break;
+
+                let baseProgress = i / totalFrames;
+
+                let progress;
+                if (loopMode === 'pingpong') {
+                    progress = baseProgress <= 0.5 ? baseProgress * 2 : 2 - baseProgress * 2;
+                } else {
+                    progress = baseProgress;
+                }
+
+                if (motionBlurSamples > 0 && keyframes.length >= 2) {
+                    // ---- MOTION BLUR via sub-frame accumulation ----
+                    const ab = getAccumBuffer();
+                    ab.accumCtx.clearRect(0, 0, WIDTH, HEIGHT);
+                    ab.accumCtx.globalAlpha = 1.0 / motionBlurSamples;
+                    ab.accumCtx.globalCompositeOperation = 'lighter';
+
+                    for (let s = 0; s < motionBlurSamples; s++) {
+                        const subOffset = (s / motionBlurSamples - 0.5) * (1.0 / totalFrames) * 0.8;
+                        let subProgress = Math.max(0, Math.min(1, progress + subOffset));
+                        
+                        setCameraForProgress(subProgress);
+                        renderFrame();
+                        ab.accumCtx.drawImage(renderer.domElement, 0, 0);
+                    }
+
+                    const frame = new VideoFrame(ab.accumCanvas, { 
+                        timestamp: Math.round(i * 1e6 / fps), 
+                        alpha: 'discard' 
+                    });
+                    videoEncoder.encode(frame, { keyFrame: i % keyFrameInterval === 0 });
+                    frame.close();
+                } else {
+                    // No motion blur — standard render
+                    if (keyframes.length >= 2) {
+                        setCameraForProgress(progress);
+                    } else if (pivot) {
+                        pivot.rotation.y = progress * Math.PI * 2;
+                        camera.lookAt(controls.target);
+                    }
+
+                    renderFrame();
+
+                    const frame = new VideoFrame(renderer.domElement, { 
+                        timestamp: Math.round(i * 1e6 / fps), 
+                        alpha: 'discard' 
+                    });
+                    videoEncoder.encode(frame, { keyFrame: i % keyFrameInterval === 0 });
+                    frame.close();
+                }
+
+                // Tighter throttle — keep encoder queue shallow to limit memory
+            while (videoEncoder.encodeQueueSize >= 2) await new Promise(r => setTimeout(r, 10)); 
+
+                if (i % 3 === 0 || i === totalFrames) {
+                    const pct = Math.round((i / totalFrames) * 100);
+                    renderProgress.style.width = `${pct}%`;
+                    overlayText.innerText = `Rendering ${i}/${totalFrames} frames \u2022 ${pct}% (${preset.label})`;
+                }
+                await new Promise(r => setTimeout(r, 0));
+            }
+
+            if (encoderError) return resetState();
+
+            overlayText.innerText = `Finalizing MP4...`;
+            await videoEncoder.flush();
+            videoEncoder.close();
+            muxer.finalize();
+
+            const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `3DStudio_4K_${preset.label.replace(/\s/g, '_')}_${new Date().toISOString().replace(/:/g, '-').slice(0, 19)}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+
+            resetState();
+        }
+
+        function resetState() {
+            // Scale back DOWN to preview resolution
+            WIDTH = PREVIEW_WIDTH;
+            HEIGHT = PREVIEW_HEIGHT;
+            renderer.setSize(WIDTH, HEIGHT);
+            renderer.getContext().canvas.style.width = '100%';
+            renderer.getContext().canvas.style.height = '100%';
+            // Restore lightweight shadow map
+            keyLight.shadow.mapSize.width = 1024;
+            keyLight.shadow.mapSize.height = 1024;
+            keyLight.shadow.map?.dispose();
+            keyLight.shadow.map = null;
+            resizeWatermark();
+            freeAccumBuffer();
+
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => loadingOverlay.style.display = 'none', 500);
+            recordBtn.innerText = "\ud83c\udfac Start Render";
+            recordBtn.disabled = false;
+            controls.enabled = true;
+            isRenderingOffline = false;
+            isPreviewing = false;
+        }
+
+        recordBtn.addEventListener('click', startOfflineRender);
+
+        // =============================================
+        //  ANIMATION LOOP
+        // =============================================
+        function animate(time) {
+            requestAnimationFrame(animate);
+            
+            if (isRenderingOffline) return; 
+
+            // Smooth camera animation (snap views, zoom presets, focus)
+            if (cameraAnimating) {
+                const elapsed = performance.now() - camAnimStart;
+                let t = Math.min(elapsed / camAnimDuration, 1.0);
+                t = easeInOut(t);
+
+                camera.position.lerpVectors(camAnimFromPos, camAnimToPos, t);
+                controls.target.lerpVectors(camAnimFromTarget, camAnimToTarget, t);
+                camera.lookAt(controls.target);
+
+                if (t >= 1.0) {
+                    cameraAnimating = false;
+                    controls.enabled = true;
+                    controls.update();
+                }
+            } else if (isPreviewing) {
+                let elapsed = performance.now() - previewStartTime;
+                let rawProgress = Math.min(elapsed / previewDuration, 1.0);
+
+                let progress;
+                if (loopSelect.value === 'pingpong') {
+                    progress = rawProgress <= 0.5 ? rawProgress * 2 : 2 - rawProgress * 2;
+                } else {
+                    progress = rawProgress;
+                }
+
+                if (keyframes.length >= 2) {
+                    setCameraForProgress(progress);
+                }
+                
+                if (rawProgress >= 1.0) {
+                    if (loopSelect.value === 'loop') {
+                        previewStartTime = performance.now();
+                    } else {
+                        isPreviewing = false;
+                        controls.enabled = true;
+                    }
+                }
+            } else {
+                controls.update();
+            }
+
+            renderFrame();
+        }
+        
+        window.addEventListener('resize', () => controls.update());
+        updateTotalTime();
+        animate(0);
+    </script>
+</body>
+</html>
