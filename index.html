@@ -222,62 +222,133 @@
             background: rgba(0,0,0,0.5);
         }
         #instructions h2 { margin: 0 0 10px 0; }
-        .mobile-hint { font-size: 0.8rem; color: #ffd700; margin-top: 10px; display: none; }
+        .mobile-hint { font-size: 0.85rem; color: #ffd700; margin-top: 10px; display: none; }
 
+        /* ===== MOBILE TOUCH CONTROLS ===== */
         .touch-controls {
             position: absolute;
-            bottom: 20px;
-            width: 100%;
-            height: 150px;
+            bottom: 0; left: 0;
+            width: 100%; height: 220px;
             pointer-events: none;
             z-index: 15;
             display: none;
         }
 
+        /* Joystick */
         #joystick-zone {
             position: absolute;
-            bottom: 20px;
-            left: 20px;
-            width: 120px;
-            height: 120px;
+            bottom: 25px; left: 25px;
+            width: 140px; height: 140px;
             pointer-events: auto;
+            background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%);
+            border: 2px solid rgba(255,255,255,0.18);
+            border-radius: 50%;
         }
-
         #joystick-knob {
             position: absolute;
             top: 50%; left: 50%;
-            width: 50px; height: 50px;
-            background: rgba(255, 255, 255, 0.3);
-            border: 2px solid rgba(255,255,255,0.6);
+            width: 60px; height: 60px;
+            background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 100%);
+            border: 2px solid rgba(255,255,255,0.7);
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            box-shadow: 0 0 12px rgba(0,0,0,0.4), inset 0 0 8px rgba(255,255,255,0.1);
+            transition: box-shadow 0.15s;
+        }
+        #joystick-knob.active {
+            box-shadow: 0 0 20px rgba(74,144,226,0.6), inset 0 0 8px rgba(255,255,255,0.2);
+            border-color: #4a90e2;
         }
 
-        #jump-btn {
+        /* Right-side action buttons */
+        .mobile-action-btn {
             position: absolute;
-            bottom: 40px;
-            right: 30px;
-            width: 70px;
-            height: 70px;
-            background: rgba(74, 144, 226, 0.4);
-            border: 2px solid rgba(255,255,255,0.5);
+            right: 25px;
+            width: 72px; height: 72px;
             border-radius: 50%;
             pointer-events: auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 14px;
-            user-select: none;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 13px;
+            user-select: none; -webkit-user-select: none;
+            border: 2px solid rgba(255,255,255,0.5);
+            backdrop-filter: blur(4px);
+            transition: transform 0.1s, background 0.12s;
         }
-        #jump-btn:active { background: rgba(74, 144, 226, 0.8); }
+        .mobile-action-btn:active { transform: scale(0.92); }
 
-        @media (max-width: 600px) {
-            #minimap-container { width: 120px; top: 60px; right: 10px; }
-            #toggle-ui { display: flex; }
-            #ui-layer { display: none; top: 60px; }
+        #jump-btn {
+            bottom: 25px;
+            background: rgba(74, 144, 226, 0.4);
+        }
+        #down-btn {
+            bottom: 110px;
+            background: rgba(226, 74, 144, 0.35);
+            display: none;
+        }
+        #mobile-flight-btn {
+            bottom: 195px;
+            background: rgba(74, 226, 144, 0.3);
+            font-size: 20px;
+            border-color: rgba(74, 226, 144, 0.5);
+        }
+        #mobile-flight-btn.flight-active {
+            background: rgba(74, 226, 144, 0.6);
+            border-color: #4ae290;
+            box-shadow: 0 0 15px rgba(74,226,144,0.4);
+        }
+
+        /* Mobile settings drawer toggle */
+        #mobile-settings-btn {
+            position: absolute;
+            top: 12px; left: 12px;
+            width: 44px; height: 44px;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 10px;
+            color: white; font-size: 22px;
+            display: none; align-items: center; justify-content: center;
+            z-index: 25; cursor: pointer;
+            backdrop-filter: blur(8px);
+            -webkit-tap-highlight-color: transparent;
+        }
+        #mobile-settings-btn:active { background: rgba(0,0,0,0.9); }
+
+        /* Mobile quick-action bar (PNG, upload) */
+        #mobile-quick-bar {
+            position: absolute;
+            top: 12px; left: 66px; right: 12px;
+            height: 44px;
+            display: none; align-items: center;
+            gap: 8px; z-index: 24;
+        }
+        .mobile-quick-btn {
+            height: 40px; padding: 0 14px;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: white; font-size: 0.78rem; font-weight: 600;
+            display: flex; align-items: center; gap: 5px;
+            backdrop-filter: blur(6px);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .mobile-quick-btn:active { background: rgba(0,0,0,0.9); }
+
+        /* ===== MEDIA QUERIES ===== */
+        @media (max-width: 768px) {
+            #minimap-container { width: 110px; top: 62px; right: 8px; padding: 6px; }
+            #minimap-container #minimap-title { font-size: 0.65rem; }
+            #minimap-container #elevation-display { font-size: 0.75rem; }
+            #toggle-ui { display: none !important; } /* replaced by mobile-settings-btn */
+            #mobile-settings-btn { display: flex; }
+            #mobile-quick-bar { display: flex; }
+            #ui-layer { display: none; top: 62px; left: 8px; max-width: calc(100vw - 16px); max-height: calc(100vh - 70px); }
+            #cinema-panel { width: calc(100vw - 20px); max-width: 340px; top: 8px; padding: 12px; font-size: 0.85rem; }
+            #cinema-panel h2 { font-size: 0.95rem; }
+        }
+        @media (max-width: 420px) {
+            #minimap-container { width: 90px; }
+            #minimap-container #minimap-img { max-width: 80px; }
         }
 
         #stat-display {
@@ -324,23 +395,58 @@
             pointer-events: none;
             z-index: 15;
             display: none;
-            flex-direction: row;
-            align-items: stretch;
         }
-        .cinema-bar { background: rgba(0,0,0,0.68); flex: 1; }
-        #cinema-frame-box {
-            height: 100%;
-            aspect-ratio: 9 / 16;
-            flex-shrink: 0;
+        /* Vertical bars (9:16 portrait) */
+        #cinema-frame-overlay.orient-portrait { flex-direction: row; align-items: stretch; }
+        #cinema-frame-overlay.orient-portrait .cinema-bar-v { background: rgba(0,0,0,0.68); flex: 1; }
+        #cinema-frame-overlay.orient-portrait .cinema-bar-h { display: none; }
+        #cinema-frame-overlay.orient-portrait #cinema-frame-box {
+            height: 100%; width: auto; aspect-ratio: 9 / 16;
             border-left: 2px solid rgba(255,255,255,0.55);
             border-right: 2px solid rgba(255,255,255,0.55);
+            border-top: none; border-bottom: none;
+        }
+        /* Horizontal bars (16:9 landscape) */
+        #cinema-frame-overlay.orient-landscape { flex-direction: column; align-items: stretch; }
+        #cinema-frame-overlay.orient-landscape .cinema-bar-h { background: rgba(0,0,0,0.68); flex: 1; }
+        #cinema-frame-overlay.orient-landscape .cinema-bar-v { display: none; }
+        #cinema-frame-overlay.orient-landscape #cinema-frame-box {
+            width: 100%; height: auto; aspect-ratio: 16 / 9;
+            border-top: 2px solid rgba(255,255,255,0.55);
+            border-bottom: 2px solid rgba(255,255,255,0.55);
+            border-left: none; border-right: none;
+        }
+        #cinema-frame-box {
+            flex-shrink: 0;
             box-sizing: border-box;
             position: relative;
         }
         #cinema-frame-label {
-            position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
-            color: rgba(255,255,255,0.85); font-size: 0.68rem; background: rgba(0,0,0,0.6);
-            padding: 3px 10px; border-radius: 4px; white-space: nowrap; pointer-events: none;
+            position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+            color: rgba(255,255,255,0.85); font-size: 0.68rem; background: rgba(0,0,0,0.65);
+            padding: 4px 12px; border-radius: 4px; white-space: nowrap; pointer-events: none;
+            backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);
+        }
+        /* Compact hints in the top-left corner to avoid any overlap */
+        #cinema-click-hint, #cinema-nav-hint {
+            position: absolute; top: 15px; left: 15px;
+            color: white; border-radius: 8px;
+            pointer-events: none;
+            z-index: 45; display: none;
+            backdrop-filter: blur(12px);
+            max-width: 220px;
+            line-height: 1.4;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+        #cinema-click-hint {
+            background: rgba(0,0,0,0.88); padding: 10px 14px;
+            font-size: 0.8rem; text-align: left;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        #cinema-nav-hint {
+            background: rgba(0,0,0,0.8); padding: 8px 12px;
+            font-size: 0.75rem;
+            border: 1px solid rgba(255,255,255,0.15);
         }
 
         /* Render overlay */
@@ -405,7 +511,7 @@
 </div>
 
 <div id="ui-layer">
-    <h1>Terrain Engine V4.5</h1>
+    <h1>Terrain Engine V4.6</h1>
     
     <div class="control-group">
         <label>1. Detail Level</label>
@@ -460,15 +566,22 @@
     <div class="control-group">
         <label>4. Exports</label>
         <button id="btn-export" class="btn btn-green">💾 3D Model (.glb)</button>
-        <button id="btn-open-cinema" class="btn btn-instagram" style="margin-top:6px;">🎬 4K Reel Studio (9:16)</button>
+        <button id="btn-open-cinema" class="btn btn-instagram" style="margin-top:6px;">🎬 4K Reel Studio</button>
     </div>
 </div>
 
 <!-- ===== CINEMA MODE PANEL ===== -->
 <div id="cinema-panel">
-    <h2>🎬 4K Reel Studio <span style="font-size:0.7rem;opacity:0.45;font-weight:normal;">9:16 Instagram</span></h2>
+    <h2>🎬 4K Reel Studio <span id="cinema-format-badge" style="font-size:0.7rem;opacity:0.45;font-weight:normal;">9:16 Portrait</span></h2>
 
     <div class="cp-section">
+        <div class="cp-row">
+            <span class="cp-label">Aspect Ratio</span>
+            <select id="cp-aspect">
+                <option value="9:16" selected>9:16 Portrait (Reel)</option>
+                <option value="16:9">16:9 Landscape (YouTube)</option>
+            </select>
+        </div>
         <span class="cp-label">Watermark Text</span>
         <input type="text" id="cp-watermark" placeholder="@yourhandle" style="width:100%">
     </div>
@@ -530,7 +643,7 @@
 
     <div class="cp-section">
         <button id="btn-render-reel" class="btn btn-instagram" disabled>🎬 Export 4K Reel (MP4)</button>
-        <div style="font-size:0.68rem;color:#888;margin-top:5px;text-align:center;">2160 × 3840 · 60 fps · 80 Mbps (H.264 L5.2)</div>
+        <div id="cp-export-specs" style="font-size:0.68rem;color:#888;margin-top:5px;text-align:center;">2160 × 3840 · 60 fps · 80 Mbps (H.264 L5.2)</div>
     </div>
 
     <div style="display:flex;gap:5px;margin-top:2px;">
@@ -538,28 +651,23 @@
     </div>
 </div>
 
-<!-- 9:16 frame crop overlay -->
-<div id="cinema-frame-overlay">
-    <div class="cinema-bar"></div>
+<!-- Frame crop overlay (supports both 9:16 and 16:9) -->
+<div id="cinema-frame-overlay" class="orient-portrait">
+    <div class="cinema-bar-v"></div>
+    <div class="cinema-bar-h"></div>
     <div id="cinema-frame-box">
         <div id="cinema-frame-label">9:16 · 4K Reel (2160×3840)</div>
-        <!-- Shown when unlocked: invite user to click and move -->
-        <div id="cinema-click-hint" style="display:none; position:absolute; bottom:60px; left:50%; transform:translateX(-50%);
-             background:rgba(0,0,0,0.72); color:white; padding:10px 18px; border-radius:30px;
-             font-size:0.82rem; white-space:nowrap; pointer-events:none; text-align:center;
-             border:1px solid rgba(255,255,255,0.18); backdrop-filter:blur(6px); line-height:1.6;">
-            👉 Click terrain to navigate<br>
-            <span style="opacity:0.6;font-size:0.73rem;">WASD = move &bull; Mouse = look &bull; ESC = back to panel</span>
-        </div>
-        <!-- Shown while pointer is locked -->
-        <div id="cinema-nav-hint" style="display:none; position:absolute; top:60px; left:50%; transform:translateX(-50%);
-             background:rgba(0,0,0,0.65); color:white; padding:8px 16px; border-radius:30px;
-             font-size:0.78rem; white-space:nowrap; pointer-events:none;
-             border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(6px);">
-            🏃 Navigating · <strong>ESC</strong> = back to panel &bull; <strong>F</strong> = flight mode
-        </div>
     </div>
-    <div class="cinema-bar"></div>
+    <div class="cinema-bar-v"></div>
+    <div class="cinema-bar-h"></div>
+    <!-- Hints live on the overlay (not inside frame-box) so they're never clipped -->
+    <div id="cinema-click-hint">
+        👉 Click the terrain to enter navigation<br>
+        <span style="opacity:0.6;font-size:0.73rem;">WASD = move &bull; Mouse = look &bull; F = flight &bull; ESC = back to panel</span>
+    </div>
+    <div id="cinema-nav-hint">
+        🏃 Navigating &mdash; <strong>ESC</strong> = return to panel &bull; <strong>F</strong> = toggle flight
+    </div>
 </div>
 
 <!-- Render progress overlay -->
@@ -570,18 +678,27 @@
     <div style="font-size:0.73rem;opacity:0.45;margin-top:-6px;">Keep this tab open &amp; active during export.</div>
 </div>
 
+<!-- Mobile settings & quick-actions -->
+<div id="mobile-settings-btn">⚙️</div>
+<div id="mobile-quick-bar">
+    <div class="mobile-quick-btn" id="mobile-upload-btn">📂 Upload</div>
+    <div class="mobile-quick-btn" id="mobile-png-btn">📸 4K PNG</div>
+    <div class="mobile-quick-btn" id="mobile-cinema-btn">🎬 Reel</div>
+</div>
+
 <div id="blocker">
     <div id="instructions">
-        <h2>Click to Start</h2>
+        <h2>Tap to Start</h2>
         <p>Desktop: WASD to Move, Mouse to Look, P for 4K PNG</p>
-        <p class="mobile-hint">Mobile: Left Joystick Move, Right Side Look</p>
+        <p class="mobile-hint">Joystick to Move · Swipe to Look · Tap buttons for actions</p>
     </div>
 </div>
 
 <div class="touch-controls" id="touch-ui">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
-    <div id="jump-btn">JUMP</div>
-    <div id="down-btn" style="display:none; position: absolute; bottom: 120px; right: 30px; width: 60px; height: 60px; background: rgba(226, 74, 144, 0.4); border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; pointer-events: auto; display: none; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; user-select: none;">DOWN</div>
+    <div id="jump-btn" class="mobile-action-btn">JUMP</div>
+    <div id="down-btn" class="mobile-action-btn">DOWN</div>
+    <div id="mobile-flight-btn" class="mobile-action-btn">✈️</div>
 </div>
 
 <div id="canvas-container"></div>
@@ -652,21 +769,36 @@
     let _cinemaCurve = null;    // active CatmullRom curve during preview/export
 
     // Export constants
-    const REEL_WIDTH = 2160, REEL_HEIGHT = 3840, REEL_FPS = 60, REEL_BITRATE = 80_000_000;
+    const REEL_FPS = 60, REEL_BITRATE = 80_000_000;
+    const REEL_SUPERSAMPLE = 2; // render at 2x and downscale for PNG-grade sharpness
     const PNG_EXPORT_LONG_EDGE = 3840;
     const PNG_EXPORT_SUPERSAMPLE = 2;
     const PNG_EXPORT_DPI = 300;
     let isPngExporting = false;
 
+    // Dynamic reel dimensions based on selected aspect ratio
+    function getReelDimensions() {
+        const sel = document.getElementById('cp-aspect');
+        const aspect = sel ? sel.value : '9:16';
+        if (aspect === '16:9') return { width: 3840, height: 2160 };
+        return { width: 2160, height: 3840 }; // 9:16 default
+    }
+
     init();
     animate();
 
     function init() {
-        isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        // Detect mobile/touch devices more reliably
+        isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            || ('ontouchstart' in window && navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
         if(isMobile) {
             document.querySelector('.mobile-hint').style.display = 'block';
             document.getElementById('touch-ui').style.display = 'block';
-            document.getElementById('toggle-ui').style.display = 'flex';
+            document.getElementById('mobile-settings-btn').style.display = 'flex';
+            document.getElementById('mobile-quick-bar').style.display = 'flex';
+            // Default to medium detail on mobile for performance
+            const resSel = document.getElementById('resolution-selector');
+            if (resSel && parseInt(resSel.value) > 256) { resSel.value = '256'; CHUNK_RES = 256; }
         }
 
         const container = document.getElementById('canvas-container');
@@ -818,6 +950,26 @@
         
         if(isMobile) setupTouchControls();
         window.addEventListener('resize', onWindowResize);
+
+        // --- Mobile-specific handlers ---
+        document.getElementById('mobile-settings-btn').addEventListener('click', () => {
+            const ui = document.getElementById('ui-layer');
+            if (ui.style.display === 'none' || !ui.style.display) {
+                ui.style.display = 'block';
+                ui.style.opacity = '1';
+            } else {
+                ui.style.display = 'none';
+            }
+        });
+        document.getElementById('mobile-upload-btn').addEventListener('click', () => {
+            document.getElementById('heightmap-upload').click();
+        });
+        document.getElementById('mobile-png-btn').addEventListener('click', () => {
+            exportUltraPng();
+        });
+        document.getElementById('mobile-cinema-btn').addEventListener('click', () => {
+            enterCinemaMode();
+        });
     }
 
     function setRealisticScale() {
@@ -1626,42 +1778,149 @@
         const joystickZone = document.getElementById('joystick-zone');
         const knob = document.getElementById('joystick-knob');
         const jumpBtn = document.getElementById('jump-btn');
-        let touchId = null; let startX = 0, startY = 0;
+        const downBtn = document.getElementById('down-btn');
+        const flightBtn = document.getElementById('mobile-flight-btn');
 
-        joystickZone.addEventListener('touchstart', (e) => { e.preventDefault(); const touch = e.changedTouches[0]; touchId = touch.identifier; startX = touch.clientX; startY = touch.clientY; }, {passive: false});
-        joystickZone.addEventListener('touchmove', (e) => { e.preventDefault(); for(let i=0; i<e.changedTouches.length; i++) { if(e.changedTouches[i].identifier === touchId) { const touch = e.changedTouches[i]; let dx = touch.clientX - startX; let dy = touch.clientY - startY; const distance = Math.sqrt(dx*dx + dy*dy); const maxDist = 35; if(distance > maxDist) { dx = (dx/distance) * maxDist; dy = (dy/distance) * maxDist; } knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; moveForward = dy < -10; moveBackward = dy > 10; moveLeft = dx < -10; moveRight = dx > 10; } } }, {passive: false});
-        const resetJoystick = () => { touchId = null; knob.style.transform = `translate(-50%, -50%)`; moveForward = moveBackward = moveLeft = moveRight = false; };
-        joystickZone.addEventListener('touchend', resetJoystick); joystickZone.addEventListener('touchcancel', resetJoystick);
-        jumpBtn.addEventListener('touchstart', (e) => { 
-            e.preventDefault(); 
+        // ---- JOYSTICK (left side) ----
+        let joyTouchId = null;
+        let joyStartX = 0, joyStartY = 0;
+        const joyMaxDist = 45; // larger travel for better control
+
+        joystickZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            joyTouchId = touch.identifier;
+            joyStartX = touch.clientX;
+            joyStartY = touch.clientY;
+            knob.classList.add('active');
+        }, { passive: false });
+
+        joystickZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joyTouchId) {
+                    const touch = e.changedTouches[i];
+                    let dx = touch.clientX - joyStartX;
+                    let dy = touch.clientY - joyStartY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance > joyMaxDist) {
+                        dx = (dx / distance) * joyMaxDist;
+                        dy = (dy / distance) * joyMaxDist;
+                    }
+                    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                    // Dead zone of 8px for precision
+                    moveForward  = dy < -8;
+                    moveBackward = dy > 8;
+                    moveLeft     = dx < -8;
+                    moveRight    = dx > 8;
+                    // Proportional speed: farther from center = faster (via isRunning)
+                    isRunning = distance > joyMaxDist * 0.75;
+                }
+            }
+        }, { passive: false });
+
+        const resetJoystick = () => {
+            joyTouchId = null;
+            knob.style.transform = 'translate(-50%, -50%)';
+            knob.classList.remove('active');
+            moveForward = moveBackward = moveLeft = moveRight = false;
+            isRunning = false;
+        };
+        joystickZone.addEventListener('touchend', resetJoystick);
+        joystickZone.addEventListener('touchcancel', resetJoystick);
+
+        // ---- ACTION BUTTONS ----
+        // Jump / Up
+        jumpBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
             if (flightMode) {
                 moveUp = true;
-                jumpBtn.innerText = 'UP';
-            } else if (canJump) { 
-                velocity.y += 350; 
-                canJump = false; 
+            } else if (canJump) {
+                velocity.y += 350;
+                canJump = false;
             }
-            jumpBtn.style.background = "rgba(74, 144, 226, 0.8)"; 
-        }, {passive: false});
-        jumpBtn.addEventListener('touchend', () => { 
+            jumpBtn.style.background = 'rgba(74, 144, 226, 0.8)';
+        }, { passive: false });
+        jumpBtn.addEventListener('touchend', () => {
             moveUp = false;
-            if (!flightMode) jumpBtn.innerText = 'JUMP';
-            jumpBtn.style.background = "rgba(74, 144, 226, 0.4)"; 
+            jumpBtn.style.background = 'rgba(74, 144, 226, 0.4)';
         });
-        
-        const downBtn = document.getElementById('down-btn');
-        downBtn.addEventListener('touchstart', (e) => { 
-            e.preventDefault(); 
+
+        // Down (flight only)
+        downBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
             moveDown = true;
-            downBtn.style.background = "rgba(226, 74, 144, 0.8)"; 
-        }, {passive: false});
-        downBtn.addEventListener('touchend', () => { 
+            downBtn.style.background = 'rgba(226, 74, 144, 0.7)';
+        }, { passive: false });
+        downBtn.addEventListener('touchend', () => {
             moveDown = false;
-            downBtn.style.background = "rgba(226, 74, 144, 0.4)"; 
+            downBtn.style.background = 'rgba(226, 74, 144, 0.35)';
         });
-        
-        document.addEventListener('touchstart', (e) => { if(e.target.closest('#joystick-zone') || e.target.closest('#ui-layer') || e.target.closest('#jump-btn') || e.target.closest('#down-btn') || e.target.closest('#toggle-ui')) return; touchLookStartX = e.touches[0].clientX; touchLookStartY = e.touches[0].clientY; });
-        document.addEventListener('touchmove', (e) => { if(e.target.closest('#joystick-zone') || e.target.closest('#ui-layer') || e.target.closest('#jump-btn') || e.target.closest('#down-btn')) return; const x = e.touches[0].clientX; const y = e.touches[0].clientY; const sensitivity = 0.005; const deltaX = x - touchLookStartX; const deltaY = y - touchLookStartY; controls.getObject().rotation.y -= deltaX * sensitivity; cameraPitch -= deltaY * sensitivity; cameraPitch = Math.max( - Math.PI / 2, Math.min( Math.PI / 2, cameraPitch ) ); camera.rotation.x = cameraPitch; touchLookStartX = x; touchLookStartY = y; });
+
+        // Flight toggle
+        flightBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            toggleFlightMode();
+            flightBtn.classList.toggle('flight-active', flightMode);
+        }, { passive: false });
+
+        // ---- TOUCH LOOK (right side / anywhere else) ----
+        // Uses multi-touch tracking to separate joystick from look
+        let lookTouchId = null;
+        let lookStartX = 0, lookStartY = 0;
+        const lookSensitivity = 0.012; // much smoother than 0.005
+
+        // Determine if a touch target is a UI element (shouldn't trigger look)
+        const isUITouch = (e) => {
+            const t = e.target;
+            return t.closest('#joystick-zone') || t.closest('#jump-btn') || t.closest('#down-btn')
+                || t.closest('#mobile-flight-btn') || t.closest('#ui-layer') || t.closest('#toggle-ui')
+                || t.closest('#mobile-settings-btn') || t.closest('#mobile-quick-bar')
+                || t.closest('#cinema-panel') || t.closest('#blocker') || t.closest('#minimap-container');
+        };
+
+        document.addEventListener('touchstart', (e) => {
+            if (isUITouch(e)) return;
+            // Find a finger that isn't the joystick
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier !== joyTouchId && lookTouchId === null) {
+                    lookTouchId = t.identifier;
+                    lookStartX = t.clientX;
+                    lookStartY = t.clientY;
+                    break;
+                }
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (lookTouchId === null) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === lookTouchId) {
+                    const deltaX = t.clientX - lookStartX;
+                    const deltaY = t.clientY - lookStartY;
+                    controls.getObject().rotation.y -= deltaX * lookSensitivity;
+                    cameraPitch -= deltaY * lookSensitivity;
+                    cameraPitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraPitch));
+                    camera.rotation.x = cameraPitch;
+                    lookStartX = t.clientX;
+                    lookStartY = t.clientY;
+                    break;
+                }
+            }
+        }, { passive: true });
+
+        const endLook = (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === lookTouchId) {
+                    lookTouchId = null;
+                    break;
+                }
+            }
+        };
+        document.addEventListener('touchend', endLook, { passive: true });
+        document.addEventListener('touchcancel', endLook, { passive: true });
     }
 
     function onWindowResize() {
@@ -1703,6 +1962,12 @@
         document.getElementById('ui-layer').style.display = 'none';
         document.getElementById('minimap-container').style.display = 'none';
         document.getElementById('blocker').style.display = 'none';
+        // Hide mobile UI elements
+        if (isMobile) {
+            document.getElementById('mobile-settings-btn').style.display = 'none';
+            document.getElementById('mobile-quick-bar').style.display = 'none';
+            document.getElementById('touch-ui').style.display = 'none';
+        }
 
         // Clicking the canvas (not on UI) locks FPS navigation
         const container = document.getElementById('canvas-container');
@@ -1710,7 +1975,7 @@
             if (isCinemaMode && !controls.isLocked &&
                 !e.target.closest('#cinema-panel') &&
                 !e.target.closest('#cinema-frame-overlay')) {
-                controls.lock();
+                if (!isMobile) controls.lock();
             }
         };
         container.addEventListener('click', container._cinemaClickHandler);
@@ -1731,9 +1996,18 @@
         document.getElementById('cinema-frame-overlay').style.display = 'none';
         document.getElementById('cinema-click-hint').style.display = 'none';
         document.getElementById('cinema-nav-hint').style.display = 'none';
-        document.getElementById('ui-layer').style.display = 'block';
         document.getElementById('minimap-container').style.display = 'flex';
-        document.getElementById('blocker').style.display = 'flex';
+        // Restore mobile UI or desktop UI
+        if (isMobile) {
+            document.getElementById('mobile-settings-btn').style.display = 'flex';
+            document.getElementById('mobile-quick-bar').style.display = 'flex';
+            document.getElementById('touch-ui').style.display = 'block';
+            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('blocker').style.display = 'none';
+        } else {
+            document.getElementById('ui-layer').style.display = 'block';
+            document.getElementById('blocker').style.display = 'flex';
+        }
     }
 
     // --- Keyframe Management ---
@@ -1804,9 +2078,11 @@
         const total   = getKfTotalDuration();
         const loop    = document.getElementById('cp-loop').value;
         const display = loop === 'pingpong' ? total * 2 : total;
+        const { width: rw, height: rh } = getReelDimensions();
+        const aspectLabel = rw < rh ? '9:16' : '16:9';
         document.getElementById('kf-total-sec').textContent    = display.toFixed(1);
         document.getElementById('kf-total-frames').textContent =
-            `${Math.ceil(display * REEL_FPS)} frames @ ${REEL_FPS}fps · ${(REEL_BITRATE/1e6).toFixed(0)} Mbps · 4K`;
+            `${Math.ceil(display * REEL_FPS)} frames @ ${REEL_FPS}fps · ${(REEL_BITRATE/1e6).toFixed(0)} Mbps · 4K ${aspectLabel}`;
     }
 
     // --- Curve & Progress Helpers ---
@@ -1888,14 +2164,16 @@
         _wmCtx.clearRect(0, 0, w, h);
         const text = (document.getElementById('cp-watermark').value || '').trim();
         if (!text) { _wmTex.needsUpdate = true; return; }
-        const fs   = Math.round(70 * (w / REEL_WIDTH));
-        const yPos = Math.round(350 * (h / REEL_HEIGHT));
+        const refDim = Math.max(w, h); // scale relative to longest edge
+        const fs   = Math.round(70 * (refDim / 3840));
+        // Position at the bottom area — clearly visible, never clipped
+        const yPos = h - Math.round(200 * (h / Math.max(h, 3840)));
         _wmCtx.fillStyle    = 'rgba(255,255,255,0.42)';
         _wmCtx.font         = `bold ${fs}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
         _wmCtx.textAlign    = 'center';
         _wmCtx.textBaseline = 'middle';
         _wmCtx.shadowColor  = 'rgba(0,0,0,0.8)';
-        _wmCtx.shadowBlur   = Math.round(10 * (w / REEL_WIDTH));
+        _wmCtx.shadowBlur   = Math.round(10 * (refDim / 3840));
         _wmCtx.shadowOffsetX = 2; _wmCtx.shadowOffsetY = 2;
         _wmCtx.fillText(text, w / 2, yPos);
         _wmTex.needsUpdate = true;
@@ -1913,35 +2191,49 @@
         isReelRendering = true;
         if (controls.isLocked) controls.unlock();
 
+        const { width: REEL_W, height: REEL_H } = getReelDimensions();
+        const aspectLabel = REEL_W < REEL_H ? '9:16' : '16:9';
+
         const overlay = document.getElementById('render-overlay');
         overlay.style.display = 'flex';
-        document.getElementById('render-status-text').textContent = 'Preparing 4K render…';
+        document.getElementById('render-status-text').textContent = `Preparing 4K ${aspectLabel} render…`;
         document.getElementById('render-progress-bar').style.width = '0%';
         document.getElementById('render-progress-pct').textContent = '0%';
         document.getElementById('btn-render-reel').disabled = true;
 
         // ---------------------------------------------------------------
-        // Dedicated export renderer with preserveDrawingBuffer: true
-        // This is REQUIRED — without it, VideoFrame() reads a blank canvas
-        // because the main renderer uses preserveDrawingBuffer: false.
+        // Render at REEL_SUPERSAMPLE × resolution, then downscale each
+        // frame to output size via a high-quality canvas blit.
+        // This gives every frame the same crispness as the PNG export.
         // ---------------------------------------------------------------
+        const ssW = REEL_W * REEL_SUPERSAMPLE;
+        const ssH = REEL_H * REEL_SUPERSAMPLE;
+
         const exportRenderer = new THREE.WebGLRenderer({
             antialias: true,
             preserveDrawingBuffer: true,
             powerPreference: 'high-performance'
         });
-        exportRenderer.setPixelRatio(1); // exactly REEL_WIDTH × REEL_HEIGHT px
-        exportRenderer.setSize(REEL_WIDTH, REEL_HEIGHT);
+        exportRenderer.setPixelRatio(1);
+        exportRenderer.setSize(ssW, ssH);
         exportRenderer.shadowMap.enabled = true;
         exportRenderer.shadowMap.type    = THREE.PCFSoftShadowMap;
         exportRenderer.autoClear = false;
 
-        // Override camera aspect for 9:16
+        // Downscale canvas — high-quality bicubic shrink to output size
+        const dsCanvas = document.createElement('canvas');
+        dsCanvas.width = REEL_W;
+        dsCanvas.height = REEL_H;
+        const dsCtx = dsCanvas.getContext('2d', { alpha: false });
+        dsCtx.imageSmoothingEnabled = true;
+        dsCtx.imageSmoothingQuality = 'high';
+
+        // Override camera aspect
         const prevAspect = camera.aspect;
-        camera.aspect = REEL_WIDTH / REEL_HEIGHT;
+        camera.aspect = REEL_W / REEL_H;
         camera.updateProjectionMatrix();
 
-        initWatermark(REEL_WIDTH, REEL_HEIGHT);
+        initWatermark(REEL_W, REEL_H);
 
         // Disable fog — removes the haze that makes distant terrain look soft/blurry
         const prevFog = scene.fog;
@@ -1956,14 +2248,12 @@
         const kfInterval   = REEL_FPS; // I-frame every second for reliable seeking
 
         // H.264 High/Main Profile Level 5.2 and 5.1 only.
-        // Level 6.x is accepted by Chrome's encoder but rejected by virtually
-        // every desktop/mobile player — that’s why the file couldn’t be opened.
         const codecs = ['avc1.640034', 'avc1.640033', 'avc1.4D4034', 'avc1.4D4033'];
         let codec = 'avc1.640033'; // Safe fallback: High L5.1
         for (const c of codecs) {
             try {
                 const s = await VideoEncoder.isConfigSupported({
-                    codec: c, width: REEL_WIDTH, height: REEL_HEIGHT,
+                    codec: c, width: REEL_W, height: REEL_H,
                     bitrate: REEL_BITRATE, framerate: REEL_FPS
                 });
                 if (s.supported) { codec = c; break; }
@@ -1972,7 +2262,7 @@
 
         const muxer = new Mp4Muxer.Muxer({
             target: new Mp4Muxer.ArrayBufferTarget(),
-            video: { codec: 'avc', width: REEL_WIDTH, height: REEL_HEIGHT },
+            video: { codec: 'avc', width: REEL_W, height: REEL_H },
             fastStart: 'in-memory'
         });
 
@@ -1983,24 +2273,24 @@
         });
         enc.configure({
             codec,
-            width: REEL_WIDTH, height: REEL_HEIGHT,
+            width: REEL_W, height: REEL_H,
             bitrate: REEL_BITRATE,
             framerate: REEL_FPS,
-            bitrateMode: 'constant',   // force target bitrate
-            latencyMode: 'quality',    // best quality — fine for offline rendering
+            bitrateMode: 'constant',
+            latencyMode: 'quality',
             hardwareAcceleration: 'prefer-hardware'
         });
 
-        // Motion-blur accumulation canvas (optional)
+        // Motion-blur accumulation canvas (optional, at output size)
         let accumCanvas = null, accumCtx = null;
         if (mbSamples > 0) {
             accumCanvas = document.createElement('canvas');
-            accumCanvas.width = REEL_WIDTH; accumCanvas.height = REEL_HEIGHT;
+            accumCanvas.width = REEL_W; accumCanvas.height = REEL_H;
             accumCtx = accumCanvas.getContext('2d', { willReadFrequently: false });
             accumCtx.imageSmoothingEnabled = false;
         }
 
-        // Inline render helper that uses the dedicated exportRenderer
+        // Render at supersample size, then produce a sharp output-size frame
         const renderFrame = () => {
             exportRenderer.clear();
             exportRenderer.render(scene, camera);
@@ -2011,6 +2301,11 @@
             exportRenderer.getContext().flush();
         };
 
+        // Downscale the supersample canvas to output-size canvas
+        const downsampleFrame = () => {
+            dsCtx.drawImage(exportRenderer.domElement, 0, 0, REEL_W, REEL_H);
+        };
+
         for (let i = 0; i <= totalFrames && !encErr; i++) {
             const base = i / totalFrames;
             const progress = (loop === 'pingpong')
@@ -2018,21 +2313,23 @@
                 : base;
 
             if (mbSamples > 0) {
-                accumCtx.clearRect(0, 0, REEL_WIDTH, REEL_HEIGHT);
+                accumCtx.clearRect(0, 0, REEL_W, REEL_H);
                 accumCtx.globalAlpha = 1.0 / mbSamples;
                 accumCtx.globalCompositeOperation = 'lighter';
                 for (let s = 0; s < mbSamples; s++) {
                     const sub = Math.max(0, Math.min(1, progress + (s / mbSamples - 0.5) * (1 / totalFrames) * 0.8));
                     applyCinemaState(sub, curve, segs, totalDur);
                     renderFrame();
-                    accumCtx.drawImage(exportRenderer.domElement, 0, 0);
+                    downsampleFrame();
+                    accumCtx.drawImage(dsCanvas, 0, 0);
                 }
                 const f = new VideoFrame(accumCanvas, { timestamp: Math.round(i * 1e6 / REEL_FPS), alpha: 'discard' });
                 enc.encode(f, { keyFrame: i % kfInterval === 0 }); f.close();
             } else {
                 applyCinemaState(progress, curve, segs, totalDur);
                 renderFrame();
-                const f = new VideoFrame(exportRenderer.domElement, { timestamp: Math.round(i * 1e6 / REEL_FPS), alpha: 'discard' });
+                downsampleFrame();
+                const f = new VideoFrame(dsCanvas, { timestamp: Math.round(i * 1e6 / REEL_FPS), alpha: 'discard' });
                 enc.encode(f, { keyFrame: i % kfInterval === 0 }); f.close();
             }
 
@@ -2044,7 +2341,7 @@
                 document.getElementById('render-progress-bar').style.width = `${pct}%`;
                 document.getElementById('render-progress-pct').textContent = `${pct}%`;
                 document.getElementById('render-status-text').textContent =
-                    `Rendering frame ${i} / ${totalFrames} (${pct}%) · 4K 9:16 · ${codec}`;
+                    `Rendering frame ${i} / ${totalFrames} (${pct}%) · 4K ${aspectLabel} · ${codec}`;
             }
             await new Promise(r => setTimeout(r, 0));
         }
@@ -2060,7 +2357,7 @@
             const a    = document.createElement('a');
             a.style.display = 'none';
             a.href     = url;
-            a.download = `DEM3D_4K_Reel_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp4`;
+            a.download = `DEM3D_4K_${aspectLabel.replace(':','x')}_Reel_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp4`;
             document.body.appendChild(a); a.click();
             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
         }
@@ -2087,6 +2384,27 @@
         document.getElementById('cp-pace').addEventListener('input', updateKfTotalTime);
         document.getElementById('cp-duration').addEventListener('input', updateKfTotalTime);
         document.getElementById('cp-loop').addEventListener('change', updateKfTotalTime);
+
+        // Aspect ratio selector — update overlay, labels, specs
+        document.getElementById('cp-aspect').addEventListener('change', (e) => {
+            const val = e.target.value;
+            const overlay = document.getElementById('cinema-frame-overlay');
+            const frameLabel = document.getElementById('cinema-frame-label');
+            const badge = document.getElementById('cinema-format-badge');
+            const specs = document.getElementById('cp-export-specs');
+            if (val === '16:9') {
+                overlay.className = 'orient-landscape';
+                frameLabel.textContent = '16:9 · 4K (3840×2160)';
+                badge.textContent = '16:9 Landscape';
+                specs.textContent = '3840 × 2160 · 60 fps · 80 Mbps (H.264)';
+            } else {
+                overlay.className = 'orient-portrait';
+                frameLabel.textContent = '9:16 · 4K Reel (2160×3840)';
+                badge.textContent = '9:16 Portrait';
+                specs.textContent = '2160 × 3840 · 60 fps · 80 Mbps (H.264)';
+            }
+            updateKfTotalTime();
+        });
     }
 
     function animate() {
