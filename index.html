@@ -1528,15 +1528,18 @@
         if (currentAspect >= 1) { readW = targetRes; readH = Math.round(targetRes / currentAspect); } 
         else { readH = targetRes; readW = Math.round(targetRes * currentAspect); }
 
-        // Check if file is very large (>100M pixels = ~400MB+ raw)
+        // Check if file is very large or needs high-quality downsampling to prevent aliasing ("lines")
         const sourcePixels = sourceWidth * sourceHeight;
         const isVeryLarge = sourcePixels > 100000000; // 100 million pixels
+        const needsDownsample = sourceWidth > readW * 1.5 || sourceHeight > readH * 1.5;
         
-        if (isVeryLarge) {
-            msg.innerText = `Large DEM detected (${(sourcePixels/1e6).toFixed(1)}M pixels). Using tiled reading...`;
+        if (isVeryLarge || needsDownsample) {
+            msg.innerText = isVeryLarge 
+                ? `Large DEM detected (${(sourcePixels/1e6).toFixed(1)}M px). Using tiled reading...`
+                : `High-quality downsampling to ${readW}x${readH}...`;
             await reloadGeoTiffTiled(image, readW, readH);
         } else {
-            // Standard approach for smaller files
+            // Standard approach for 1:1 scale or small files
             let rasters = null; let success = false;
             let attemptW = readW; let attemptH = readH;
             const maxAttempts = 6;
