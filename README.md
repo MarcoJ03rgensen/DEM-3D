@@ -1,8 +1,8 @@
-# 3D DEM Explorer V4.6
+# 3D DEM Explorer V5.0
 
 A web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
 
-![Version](https://img.shields.io/badge/version-4.6-blue)
+![Version](https://img.shields.io/badge/version-5.0-blue)
 ![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-green)
 
 ## 🌟 Features
@@ -27,6 +27,7 @@ A web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
   - **4K Reel Studio**: High-end cinematic video export (MP4)
   - **3D Model**: (.glb format)
   - **4K PNG**: High-fidelity static image export
+- **📱 Mobile V5 Overhaul**: Complete mobile-first redesign with touch-optimized settings drawer, quick-action toolbars (PNG/Upload/Reel shortcuts), and precision multi-touch navigation.
 
 ### 🎬 4K Reel Studio (Pro Video Export)
 - **Multi-Format Support**: Switch between **9:16 Portrait** (Reels/TikTok) and **16:9 Landscape** (YouTube/Desktop).
@@ -39,7 +40,6 @@ A web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
 - **Chunked Rendering**: Handles millions of polygons via a distributed geometry pipeline.
 - **Adaptive Precision Smoothing**: Dynamic kernel averaging based on active resolution.
 - **Smooth Terrain Collision**: Easing-based physics to absorb sharp elevation changes.
-- **Mobile Optimized**: Touch controls with virtual joystick and look controls.
 
 ## 🎮 Controls
 
@@ -53,10 +53,13 @@ A web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
 | Toggle Flight | `F` | `F` |
 
 ### Mobile
-- **Left Joystick**: Move horizontally
-- **Touch & Drag**: Look around
-- **UP Button**: Jump (ground) / Ascend (flight)
+- **Left Joystick**: Proportional movement (slide farther to sprint)
+- **Touch & Drag**: Precision look around (multi-touch separated from joystick)
+- **⚙️ Settings Button**: Slide-out configuration drawer
+- **📂 Quick Bar**: One-tap shortcuts for Upload, 4K PNG, and Reel Studio
+- **JUMP Button**: Jump (ground) / Ascend (flight)
 - **DOWN Button**: Descend (flight mode only)
+- **✈️ Flight Button**: Instant flight mode toggle with visual status
 
 ## 📊 Detail Levels
 
@@ -96,7 +99,8 @@ Licensed under the **Creative Commons Attribution-NonCommercial 4.0 Internationa
 ---
 
 **Version History:**
-- **v4.6 (2025)**: Added 16:9 Landscape support, 2x Supersampled Video Rendering, and Motion Blur.
+- **v5.0 (2025)**: **Next-Gen Mobile Overhaul**. Added touch-optimized quick bars, settings drawer, multi-touch precision look, proportional joystick movement, and mobile-friendly cinema mode.
+- **v4.6**: Added 16:9 Landscape support, 2x Supersampled Video Rendering, and Motion Blur.
 - **v4.5**: Added flight mode, heatmap visualization, and massive DEM support.
 - **v4.0**: GeoTIFF export and realistic scaling.
 - **v3.0**: Chunked rendering for high-resolution terrains.
