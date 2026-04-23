@@ -2213,6 +2213,13 @@
         // getPointAt uses arc-length parameterisation → even speed along path
         camera.position.copy(curve.getPointAt(curveT));
 
+        // --- Terrain-clamp: prevent the spline from dipping through the ground ---
+        const terrainY = getTerrainHeight(camera.position.x, camera.position.z);
+        // Only clamp when we're actually over the terrain (terrainY > -999 means valid)
+        if (terrainY > -999 && camera.position.y < terrainY + 5) {
+            camera.position.y = terrainY + 5;
+        }
+
         // Slerp quaternion — exact round-trip, no Euler-order drift
         const kfA = cinemaKeyframes[segIndex];
         const kfB = cinemaKeyframes[Math.min(segIndex + 1, cinemaKeyframes.length - 1)];
@@ -2295,9 +2302,11 @@
         // Render at REEL_SUPERSAMPLE × resolution, then downscale each
         // frame to output size via a high-quality canvas blit.
         // This gives every frame the same crispness as the PNG export.
+        // Falls back to 1x if GPU can't handle the supersample size.
         // ---------------------------------------------------------------
-        const ssW = REEL_W * REEL_SUPERSAMPLE;
-        const ssH = REEL_H * REEL_SUPERSAMPLE;
+        let ssW = REEL_W * REEL_SUPERSAMPLE;
+        let ssH = REEL_H * REEL_SUPERSAMPLE;
+        let actualSS = REEL_SUPERSAMPLE;
 
         const exportRenderer = new THREE.WebGLRenderer({
             antialias: true,
@@ -2305,7 +2314,25 @@
             powerPreference: 'high-performance'
         });
         exportRenderer.setPixelRatio(1);
-        exportRenderer.setSize(ssW, ssH);
+
+        // Check if GPU can handle the supersample size
+        const gl = exportRenderer.getContext();
+        const maxTex = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
+        if (ssW > maxTex || ssH > maxTex) {
+            console.warn(`Supersample ${ssW}x${ssH} exceeds GPU max (${maxTex}). Falling back to 1x.`);
+            ssW = REEL_W; ssH = REEL_H; actualSS = 1;
+        }
+
+        try {
+            exportRenderer.setSize(ssW, ssH);
+            // Verify the context wasn't lost
+            if (exportRenderer.getContext().isContextLost()) throw new Error('Context lost');
+        } catch (e) {
+            console.warn('Supersample render failed, falling back to 1x:', e.message);
+            ssW = REEL_W; ssH = REEL_H; actualSS = 1;
+            exportRenderer.setSize(ssW, ssH);
+        }
+
         exportRenderer.shadowMap.enabled = true;
         exportRenderer.shadowMap.type    = THREE.PCFSoftShadowMap;
         exportRenderer.autoClear = false;
@@ -2396,6 +2423,7 @@
             dsCtx.drawImage(exportRenderer.domElement, 0, 0, REEL_W, REEL_H);
         };
 
+        try {
         for (let i = 0; i <= totalFrames && !encErr; i++) {
             const base = i / totalFrames;
             const progress = (loop === 'pingpong')
@@ -2450,6 +2478,11 @@
             a.download = `DEM3D_4K_${aspectLabel.replace(':','x')}_Reel_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp4`;
             document.body.appendChild(a); a.click();
             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+        }
+
+        } catch (exportError) {
+            console.error('Reel export failed:', exportError);
+            alert(`Reel export failed: ${exportError.message}\n\nTry reducing detail level or disabling motion blur.`);
         }
 
         // Always restore state
