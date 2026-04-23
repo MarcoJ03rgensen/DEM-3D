@@ -516,14 +516,12 @@
     <div class="control-group">
         <label>1. Detail Level</label>
         <select id="resolution-selector">
-            <option value="128">Low (Fast)</option>
-            <option value="256">Medium</option>
-            <option value="512" selected>High</option>
-            <option value="1024">Ultra (1M Polys)</option>
-            <option value="2048">Hyper (4M Polys)</option>
-            <option value="4096">Extreme (16M Polys)</option>
-            <option value="8192">Extreme+ (64M Polys)</option>
-            <option value="16384">Extreme++ (256M Polys)</option>
+            <option value="512" selected>Low</option>
+            <option value="1024">Medium (1M Polys)</option>
+            <option value="2048">High (4M Polys)</option>
+            <option value="4096">Very High (16M Polys)</option>
+            <option value="8192">Extreme (64M Polys)</option>
+            <option value="16384">Extreme+ (256M Polys)</option>
         </select>
         <div id="stat-display">Res: 512x512</div>
     </div>
@@ -796,9 +794,9 @@
             document.getElementById('touch-ui').style.display = 'block';
             document.getElementById('mobile-settings-btn').style.display = 'flex';
             document.getElementById('mobile-quick-bar').style.display = 'flex';
-            // Default to medium detail on mobile for performance
+            // Default to Low detail on mobile for performance
             const resSel = document.getElementById('resolution-selector');
-            if (resSel && parseInt(resSel.value) > 256) { resSel.value = '256'; CHUNK_RES = 256; }
+            if (resSel && parseInt(resSel.value) > 512) { resSel.value = '512'; CHUNK_RES = 512; }
         }
 
         const container = document.getElementById('canvas-container');
@@ -1055,8 +1053,18 @@
                 geometry.translate(xOffset, 0, zOffset); 
 
                 const vertices = geometry.attributes.position.array;
+                const normals = new Float32Array(vertices.length);
                 const colors = [];
                 const color = new THREE.Color();
+                
+                const dx = currentWorldWidth / (width - 1);
+                const dz = currentWorldDepth / (height - 1);
+
+                const getH = (x, y) => {
+                    const safeX = Math.max(0, Math.min(width - 1, x));
+                    const safeY = Math.max(0, Math.min(height - 1, y));
+                    return processedHeightData[safeY * width + safeX] * HEIGHT_SCALE;
+                };
 
                 for (let iy = 0; iy <= currentSegY; iy++) {
                     for (let ix = 0; ix <= currentSegX; ix++) {
@@ -1064,29 +1072,43 @@
                         const globalX = startX + ix;
                         const globalY = startY + iy;
                         
-                        const safeGX = Math.min(globalX, width - 1);
-                        const safeGY = Math.min(globalY, height - 1);
-                        
-                        const dataIdx = safeGY * width + safeGX;
-                        const h = processedHeightData[dataIdx];
+                        const h = getH(globalX, globalY);
                         
                         const localIdx = iy * (currentSegX + 1) + ix;
-                        vertices[localIdx * 3 + 1] = h * HEIGHT_SCALE;
+                        vertices[localIdx * 3 + 1] = h;
+                        
+                        // Analytical normals to prevent diagonal triangle ridges
+                        const hL = getH(globalX - 1, globalY);
+                        const hR = getH(globalX + 1, globalY);
+                        const hU = getH(globalX, globalY - 1);
+                        const hD = getH(globalX, globalY + 1);
+                        
+                        const dHdx = (hR - hL) / (2 * dx);
+                        const dHdz = (hD - hU) / (2 * dz);
+                        
+                        const len = Math.sqrt(dHdx * dHdx + 1 + dHdz * dHdz);
+                        normals[localIdx * 3]     = -dHdx / len;
+                        normals[localIdx * 3 + 1] = 1 / len;
+                        normals[localIdx * 3 + 2] = -dHdz / len;
+                        
+                        // Get unscaled normalized height for colors
+                        const dataIdx = Math.min(globalY, height - 1) * width + Math.min(globalX, width - 1);
+                        const normH = processedHeightData[dataIdx];
 
                         if (style === 'grayscale') {
-                            color.setScalar(h);
+                            color.setScalar(normH);
                         } else if (style === 'heatmap') {
                             // Detailed heatmap: blue -> cyan -> green -> yellow -> red -> magenta
-                            if (h < 0.2) {
-                                color.setHex(0x0000ff).lerp(new THREE.Color(0x00ffff), h / 0.2);
-                            } else if (h < 0.4) {
-                                color.setHex(0x00ffff).lerp(new THREE.Color(0x00ff00), (h - 0.2) / 0.2);
-                            } else if (h < 0.6) {
-                                color.setHex(0x00ff00).lerp(new THREE.Color(0xffff00), (h - 0.4) / 0.2);
-                            } else if (h < 0.8) {
-                                color.setHex(0xffff00).lerp(new THREE.Color(0xff0000), (h - 0.6) / 0.2);
+                            if (normH < 0.2) {
+                                color.setHex(0x0000ff).lerp(new THREE.Color(0x00ffff), normH / 0.2);
+                            } else if (normH < 0.4) {
+                                color.setHex(0x00ffff).lerp(new THREE.Color(0x00ff00), (normH - 0.2) / 0.2);
+                            } else if (normH < 0.6) {
+                                color.setHex(0x00ff00).lerp(new THREE.Color(0xffff00), (normH - 0.4) / 0.2);
+                            } else if (normH < 0.8) {
+                                color.setHex(0xffff00).lerp(new THREE.Color(0xff0000), (normH - 0.6) / 0.2);
                             } else {
-                                color.setHex(0xff0000).lerp(new THREE.Color(0xff00ff), (h - 0.8) / 0.2);
+                                color.setHex(0xff0000).lerp(new THREE.Color(0xff00ff), (normH - 0.8) / 0.2);
                             }
                         } else { 
                             color.setHex(0xaaaaaa);
@@ -1096,7 +1118,7 @@
                 }
 
                 geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-                geometry.computeVertexNormals();
+                geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
                 
                 geometry.userData = { startX, startY, segX: currentSegX, segY: currentSegY };
 
@@ -1116,25 +1138,48 @@
         if(!processedHeightData || terrainGroup.children.length === 0) return;
         
         const width = window.terrainW;
+        const height = window.terrainH;
+        const dx = currentWorldWidth / (width - 1);
+        const dz = currentWorldDepth / (height - 1);
+        
+        const getH = (x, y) => {
+            const safeX = Math.max(0, Math.min(width - 1, x));
+            const safeY = Math.max(0, Math.min(height - 1, y));
+            return processedHeightData[safeY * width + safeX] * HEIGHT_SCALE;
+        };
         
         terrainGroup.children.forEach(mesh => {
             const geo = mesh.geometry;
             const { startX, startY, segX, segY } = geo.userData;
             const vertices = geo.attributes.position.array;
+            const normals = geo.attributes.normal.array;
             
             for (let iy = 0; iy <= segY; iy++) {
                 for (let ix = 0; ix <= segX; ix++) {
-                    const globalX = Math.min(startX + ix, width - 1);
-                    const globalY = Math.min(startY + iy, window.terrainH - 1);
-                    const h = processedHeightData[globalY * width + globalX];
+                    const globalX = startX + ix;
+                    const globalY = startY + iy;
+                    const h = getH(globalX, globalY);
                     
                     const localIdx = iy * (segX + 1) + ix;
-                    vertices[localIdx * 3 + 1] = h * HEIGHT_SCALE;
+                    vertices[localIdx * 3 + 1] = h;
+                    
+                    const hL = getH(globalX - 1, globalY);
+                    const hR = getH(globalX + 1, globalY);
+                    const hU = getH(globalX, globalY - 1);
+                    const hD = getH(globalX, globalY + 1);
+                    
+                    const dHdx = (hR - hL) / (2 * dx);
+                    const dHdz = (hD - hU) / (2 * dz);
+                    
+                    const len = Math.sqrt(dHdx * dHdx + 1 + dHdz * dHdz);
+                    normals[localIdx * 3]     = -dHdx / len;
+                    normals[localIdx * 3 + 1] = 1 / len;
+                    normals[localIdx * 3 + 2] = -dHdz / len;
                 }
             }
             
             geo.attributes.position.needsUpdate = true;
-            geo.computeVertexNormals();
+            geo.attributes.normal.needsUpdate = true;
         });
 
     }
@@ -1382,8 +1427,8 @@
     }
 
     function smoothHeights(heights, width, height) {
-        // Dynamic blur radius based on detail level
-        const radius = Math.max(1, Math.floor(width / 256));
+        // Dynamic blur radius based on detail level. Baseline minimum of 2 for smooth Low/Medium renders.
+        const radius = Math.min(4, Math.max(2, Math.floor(width / 256)));
         const temp = new Float32Array(heights.length);
         const newHeights = new Float32Array(heights.length);
 
@@ -1585,7 +1630,7 @@
         
         // Create output arrays
         const outputData = new Float32Array(targetWidth * targetHeight);
-        const outputCount = new Uint32Array(targetWidth * targetHeight);
+        const outputCount = new Float32Array(targetWidth * targetHeight);
         let globalMin = Infinity;
         let globalMax = -Infinity;
         
@@ -1659,21 +1704,43 @@
                             const sourceX = x + sx;
                             const sourceY = y + sy;
                             
-                            // Map to target coordinates
-                            const targetX = Math.floor((sourceX / sourceWidth) * targetWidth);
-                            const targetY = Math.floor((sourceY / sourceHeight) * targetHeight);
+                            // Map source coordinates to target space using bilinear splatting for perfectly smooth downsampling
+                            const targetXF = (sourceX + 0.5) / sourceWidth * targetWidth - 0.5;
+                            const targetYF = (sourceY + 0.5) / sourceHeight * targetHeight - 0.5;
                             
-                            if (targetX >= 0 && targetX < targetWidth && targetY >= 0 && targetY < targetHeight) {
-                                const tileIdx = sy * w + sx;
-                                let val = tileData[tileIdx];
-                                if (val < -10000 || val > 10000) val = globalMin;
-                                
-                                const normalized = (val - globalMin) / range;
-                                const outputIdx = targetY * targetWidth + targetX;
-                                
-                                // Average overlapping source samples to avoid synthetic ridge artifacts.
-                                outputData[outputIdx] += normalized;
-                                outputCount[outputIdx]++;
+                            const tx0 = Math.floor(targetXF);
+                            const ty0 = Math.floor(targetYF);
+                            const tx1 = tx0 + 1;
+                            const ty1 = ty0 + 1;
+                            
+                            const fx = targetXF - tx0;
+                            const fy = targetYF - ty0;
+                            
+                            const w00 = (1 - fx) * (1 - fy);
+                            const w10 = fx * (1 - fy);
+                            const w01 = (1 - fx) * fy;
+                            const w11 = fx * fy;
+                            
+                            const tileIdx = sy * w + sx;
+                            let val = tileData[tileIdx];
+                            if (val < -10000 || val > 10000) val = globalMin;
+                            const norm = (val - globalMin) / range;
+                            
+                            if (tx0 >= 0 && tx0 < targetWidth && ty0 >= 0 && ty0 < targetHeight) {
+                                const idx = ty0 * targetWidth + tx0;
+                                outputData[idx] += norm * w00; outputCount[idx] += w00;
+                            }
+                            if (tx1 >= 0 && tx1 < targetWidth && ty0 >= 0 && ty0 < targetHeight) {
+                                const idx = ty0 * targetWidth + tx1;
+                                outputData[idx] += norm * w10; outputCount[idx] += w10;
+                            }
+                            if (tx0 >= 0 && tx0 < targetWidth && ty1 >= 0 && ty1 < targetHeight) {
+                                const idx = ty1 * targetWidth + tx0;
+                                outputData[idx] += norm * w01; outputCount[idx] += w01;
+                            }
+                            if (tx1 >= 0 && tx1 < targetWidth && ty1 >= 0 && ty1 < targetHeight) {
+                                const idx = ty1 * targetWidth + tx1;
+                                outputData[idx] += norm * w11; outputCount[idx] += w11;
                             }
                         }
                     }
@@ -1697,6 +1764,16 @@
 
         for (let i = 0; i < outputData.length; i++) {
             if (outputCount[i] > 0) outputData[i] /= outputCount[i];
+        }
+        
+        // Simple hole filling in case of upsampling gaps
+        for (let y = 0; y < targetHeight; y++) {
+            let lastVal = outputData[y * targetWidth]; 
+            for (let x = 0; x < targetWidth; x++) {
+                const idx = y * targetWidth + x;
+                if (outputCount[idx] === 0) outputData[idx] = lastVal;
+                else lastVal = outputData[idx];
+            }
         }
         
         msg.innerText = 'Generating preview...';
