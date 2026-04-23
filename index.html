@@ -765,6 +765,7 @@
     let isReelRendering = false;
     let cinemaKeyframes = [];   // [{pos, yaw, pitch, duration}]
     let _cinemaCurve = null;    // active CatmullRom curve during preview/export
+    let cinemaReturnState = null;
 
     // Export constants
     const REEL_FPS = 60, REEL_BITRATE = 80_000_000;
@@ -780,6 +781,19 @@
         const aspect = sel ? sel.value : '9:16';
         if (aspect === '16:9') return { width: 3840, height: 2160 };
         return { width: 2160, height: 3840 }; // 9:16 default
+    }
+
+    function getAdaptiveReelSupersample(reelW, reelH) {
+        // Extreme geometry already consumes massive VRAM; native 4K avoids context loss while keeping output sharp.
+        let supersample = CHUNK_RES >= 8192 ? 1 : REEL_SUPERSAMPLE;
+
+        const gl = renderer ? renderer.getContext() : null;
+        const maxEdge = gl ? (gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 8192) : 8192;
+        const maxByGpu = maxEdge / Math.max(reelW, reelH);
+        supersample = Math.min(supersample, maxByGpu);
+
+        if (!Number.isFinite(supersample) || supersample < 1) return 1;
+        return Math.max(1, supersample);
     }
 
     init();
@@ -2041,6 +2055,16 @@
 
     // --- Enter / Exit Cinema Mode ---
     function enterCinemaMode() {
+        cinemaReturnState = {
+            position: camera.position.clone(),
+            quaternion: camera.quaternion.clone(),
+            flightMode,
+            wasControlsLocked: controls.isLocked,
+            uiDisplay: document.getElementById('ui-layer').style.display,
+            minimapDisplay: document.getElementById('minimap-container').style.display,
+            blockerDisplay: document.getElementById('blocker').style.display
+        };
+
         isCinemaMode = true;
         if (controls.isLocked) controls.unlock();
         document.getElementById('cinema-panel').style.display = 'block';
@@ -2072,6 +2096,7 @@
     }
 
     function exitCinemaMode() {
+        const returnState = cinemaReturnState;
         isCinemaMode = false;
         isCinemaPreview = false;
         _cinemaCurve = null;
@@ -2086,18 +2111,44 @@
         document.getElementById('cinema-frame-overlay').style.display = 'none';
         document.getElementById('cinema-click-hint').style.display = 'none';
         document.getElementById('cinema-nav-hint').style.display = 'none';
-        document.getElementById('minimap-container').style.display = 'flex';
+
+        if (returnState) {
+            if (returnState.flightMode !== flightMode) toggleFlightMode();
+            camera.position.copy(returnState.position);
+            camera.quaternion.copy(returnState.quaternion);
+        }
+
+        velocity.set(0, 0, 0);
+        moveForward = false;
+        moveBackward = false;
+        moveLeft = false;
+        moveRight = false;
+        moveUp = false;
+        moveDown = false;
+        joyMoveX = 0;
+        joyMoveY = 0;
+        isRunning = false;
+
+        document.getElementById('minimap-container').style.display = returnState ? returnState.minimapDisplay : 'flex';
         // Restore mobile UI or desktop UI
         if (isMobile) {
             document.getElementById('mobile-settings-btn').style.display = 'flex';
             document.getElementById('mobile-quick-bar').style.display = 'flex';
             document.getElementById('touch-ui').style.display = 'block';
-            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('ui-layer').style.display = returnState ? returnState.uiDisplay : 'none';
             document.getElementById('blocker').style.display = 'none';
         } else {
-            document.getElementById('ui-layer').style.display = 'block';
-            document.getElementById('blocker').style.display = 'flex';
+            document.getElementById('ui-layer').style.display = returnState ? returnState.uiDisplay : 'block';
+            document.getElementById('blocker').style.display = returnState
+                ? (returnState.wasControlsLocked ? 'none' : returnState.blockerDisplay || 'flex')
+                : 'flex';
+
+            if (returnState && returnState.wasControlsLocked) {
+                controls.lock();
+            }
         }
+
+        cinemaReturnState = null;
     }
 
     // --- Keyframe Management ---
@@ -2284,7 +2335,7 @@
     // --- Render a single composite frame (scene + watermark) ---
     // --- 4K Offline Export ---
     async function startReelExport() {
-        if (cinemaKeyframes.length < 2) return;
+        if (cinemaKeyframes.length < 2 || isPngExporting || !renderer || !camera || !scene) return;
         isReelRendering = true;
         if (controls.isLocked) controls.unlock();
 
@@ -2292,208 +2343,301 @@
         const aspectLabel = REEL_W < REEL_H ? '9:16' : '16:9';
 
         const overlay = document.getElementById('render-overlay');
+        const statusText = document.getElementById('render-status-text');
+        const progressBar = document.getElementById('render-progress-bar');
+        const progressPct = document.getElementById('render-progress-pct');
+        const renderButton = document.getElementById('btn-render-reel');
+
         overlay.style.display = 'flex';
-        document.getElementById('render-status-text').textContent = `Preparing 4K ${aspectLabel} render…`;
-        document.getElementById('render-progress-bar').style.width = '0%';
-        document.getElementById('render-progress-pct').textContent = '0%';
-        document.getElementById('btn-render-reel').disabled = true;
+        statusText.textContent = `Preparing 4K ${aspectLabel} render…`;
+        progressBar.style.width = '0%';
+        progressPct.textContent = '0%';
+        renderButton.disabled = true;
 
-        // ---------------------------------------------------------------
-        // Render at REEL_SUPERSAMPLE × resolution, then downscale each
-        // frame to output size via a high-quality canvas blit.
-        // This gives every frame the same crispness as the PNG export.
-        // Falls back to 1x if GPU can't handle the supersample size.
-        // ---------------------------------------------------------------
-        let ssW = REEL_W * REEL_SUPERSAMPLE;
-        let ssH = REEL_H * REEL_SUPERSAMPLE;
-        let actualSS = REEL_SUPERSAMPLE;
+        // Reuse the existing renderer context so large terrains are not duplicated in GPU memory.
+        const exportRenderer = renderer;
+        const oldPixelRatio = exportRenderer.getPixelRatio();
+        const oldSize = new THREE.Vector2();
+        exportRenderer.getSize(oldSize);
+        const oldAutoClear = exportRenderer.autoClear;
+        const oldShadowEnabled = exportRenderer.shadowMap.enabled;
+        const oldShadowType = exportRenderer.shadowMap.type;
+        const oldShadowAutoUpdate = exportRenderer.shadowMap.autoUpdate;
+        const oldShadowNeedsUpdate = exportRenderer.shadowMap.needsUpdate;
 
-        const exportRenderer = new THREE.WebGLRenderer({
-            antialias: true,
-            preserveDrawingBuffer: true,
-            powerPreference: 'high-performance'
-        });
-        exportRenderer.setPixelRatio(1);
-
-        // Check if GPU can handle the supersample size
-        const gl = exportRenderer.getContext();
-        const maxTex = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
-        if (ssW > maxTex || ssH > maxTex) {
-            console.warn(`Supersample ${ssW}x${ssH} exceeds GPU max (${maxTex}). Falling back to 1x.`);
-            ssW = REEL_W; ssH = REEL_H; actualSS = 1;
-        }
-
-        try {
-            exportRenderer.setSize(ssW, ssH);
-            // Verify the context wasn't lost
-            if (exportRenderer.getContext().isContextLost()) throw new Error('Context lost');
-        } catch (e) {
-            console.warn('Supersample render failed, falling back to 1x:', e.message);
-            ssW = REEL_W; ssH = REEL_H; actualSS = 1;
-            exportRenderer.setSize(ssW, ssH);
-        }
-
-        exportRenderer.shadowMap.enabled = true;
-        exportRenderer.shadowMap.type    = THREE.PCFSoftShadowMap;
-        exportRenderer.autoClear = false;
-
-        // Downscale canvas — high-quality bicubic shrink to output size
-        const dsCanvas = document.createElement('canvas');
-        dsCanvas.width = REEL_W;
-        dsCanvas.height = REEL_H;
-        const dsCtx = dsCanvas.getContext('2d', { alpha: false });
-        dsCtx.imageSmoothingEnabled = true;
-        dsCtx.imageSmoothingQuality = 'high';
-
-        // Override camera aspect
         const prevAspect = camera.aspect;
-        camera.aspect = REEL_W / REEL_H;
-        camera.updateProjectionMatrix();
-
-        initWatermark(REEL_W, REEL_H);
-
-        // Disable fog — removes the haze that makes distant terrain look soft/blurry
         const prevFog = scene.fog;
-        scene.fog = null;
 
-        const curve = buildCinemaCurve();
-        const { segs, total: totalDur } = getSegmentTimes();
-        const loop         = document.getElementById('cp-loop').value;
-        const mbSamples    = parseInt(document.getElementById('cp-motionblur').value) || 0;
-        const renderDurSec = loop === 'pingpong' ? totalDur * 2 : totalDur;
-        const totalFrames  = Math.ceil(renderDurSec * REEL_FPS);
-        const kfInterval   = REEL_FPS; // I-frame every second for reliable seeking
-
-        // H.264 High/Main Profile Level 5.2 and 5.1 only.
-        const codecs = ['avc1.640034', 'avc1.640033', 'avc1.4D4034', 'avc1.4D4033'];
-        let codec = 'avc1.640033'; // Safe fallback: High L5.1
-        for (const c of codecs) {
-            try {
-                const s = await VideoEncoder.isConfigSupported({
-                    codec: c, width: REEL_W, height: REEL_H,
-                    bitrate: REEL_BITRATE, framerate: REEL_FPS
-                });
-                if (s.supported) { codec = c; break; }
-            } catch (e) { /* try next */ }
-        }
-
-        const muxer = new Mp4Muxer.Muxer({
-            target: new Mp4Muxer.ArrayBufferTarget(),
-            video: { codec: 'avc', width: REEL_W, height: REEL_H },
-            fastStart: 'in-memory'
-        });
-
-        let encErr = false;
-        const enc = new VideoEncoder({
-            output: (chunk, meta) => { if (!encErr) muxer.addVideoChunk(chunk, meta); },
-            error: (e) => { encErr = true; alert('Encoding error: ' + e.message); }
-        });
-        enc.configure({
-            codec,
-            width: REEL_W, height: REEL_H,
-            bitrate: REEL_BITRATE,
-            framerate: REEL_FPS,
-            bitrateMode: 'constant',
-            latencyMode: 'quality',
-            hardwareAcceleration: 'prefer-hardware'
-        });
-
-        // Motion-blur accumulation canvas (optional, at output size)
-        let accumCanvas = null, accumCtx = null;
-        if (mbSamples > 0) {
-            accumCanvas = document.createElement('canvas');
-            accumCanvas.width = REEL_W; accumCanvas.height = REEL_H;
-            accumCtx = accumCanvas.getContext('2d', { willReadFrequently: false });
-            accumCtx.imageSmoothingEnabled = false;
-        }
-
-        // Render at supersample size, then produce a sharp output-size frame
-        const renderFrame = () => {
-            exportRenderer.clear();
-            exportRenderer.render(scene, camera);
-            if (_wmScene && _wmCamera) {
-                exportRenderer.clearDepth();
-                exportRenderer.render(_wmScene, _wmCamera);
-            }
-            exportRenderer.getContext().flush();
+        let encoder = null;
+        let muxer = null;
+        let muxerFinalized = false;
+        let encoderErrorMessage = '';
+        let lostDuringExport = false;
+        const onContextLost = (ev) => {
+            ev.preventDefault();
+            lostDuringExport = true;
         };
 
-        // Downscale the supersample canvas to output-size canvas
-        const downsampleFrame = () => {
-            dsCtx.drawImage(exportRenderer.domElement, 0, 0, REEL_W, REEL_H);
-        };
+        exportRenderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
 
         try {
-        for (let i = 0; i <= totalFrames && !encErr; i++) {
-            const base = i / totalFrames;
-            const progress = (loop === 'pingpong')
-                ? (base <= 0.5 ? base * 2 : 2 - base * 2)
-                : base;
+            const adaptiveSupersample = getAdaptiveReelSupersample(REEL_W, REEL_H);
+            let ssW = Math.max(1, Math.floor(REEL_W * adaptiveSupersample));
+            let ssH = Math.max(1, Math.floor(REEL_H * adaptiveSupersample));
+            const gl = exportRenderer.getContext();
+            const maxTex = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 8192;
+            if (ssW > maxTex || ssH > maxTex) {
+                console.warn(`Supersample ${ssW}x${ssH} exceeds GPU max (${maxTex}). Falling back to 1x.`);
+                ssW = REEL_W;
+                ssH = REEL_H;
+            }
 
+            if (ssW === REEL_W && ssH === REEL_H && adaptiveSupersample < REEL_SUPERSAMPLE) {
+                statusText.textContent = `Preparing 4K ${aspectLabel} render (stability mode)…`;
+            }
+
+            exportRenderer.setPixelRatio(1);
+            try {
+                exportRenderer.setSize(ssW, ssH, false);
+                if (exportRenderer.getContext().isContextLost()) throw new Error('Context lost');
+            } catch (e) {
+                console.warn('Supersample render failed, falling back to 1x:', e.message);
+                ssW = REEL_W;
+                ssH = REEL_H;
+                exportRenderer.setSize(ssW, ssH, false);
+            }
+
+            exportRenderer.shadowMap.enabled = true;
+            exportRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            exportRenderer.shadowMap.autoUpdate = false;
+            exportRenderer.shadowMap.needsUpdate = true;
+            exportRenderer.autoClear = false;
+
+            const dsCanvas = document.createElement('canvas');
+            dsCanvas.width = REEL_W;
+            dsCanvas.height = REEL_H;
+            const dsCtx = dsCanvas.getContext('2d', { alpha: false });
+            if (!dsCtx) throw new Error('Could not create reel downsample context.');
+            dsCtx.imageSmoothingEnabled = true;
+            dsCtx.imageSmoothingQuality = 'high';
+
+            camera.aspect = REEL_W / REEL_H;
+            camera.updateProjectionMatrix();
+
+            initWatermark(REEL_W, REEL_H);
+            scene.fog = null;
+
+            const curve = buildCinemaCurve();
+            const { segs, total: totalDur } = getSegmentTimes();
+            const loop = document.getElementById('cp-loop').value;
+            const mbSamples = parseInt(document.getElementById('cp-motionblur').value) || 0;
+            const renderDurSec = loop === 'pingpong' ? totalDur * 2 : totalDur;
+            const totalFrames = Math.ceil(renderDurSec * REEL_FPS);
+            const kfInterval = REEL_FPS;
+
+            const codecs = ['avc1.640034', 'avc1.640033', 'avc1.4D4034', 'avc1.4D4033'];
+            let codec = 'avc1.640033';
+            for (const c of codecs) {
+                try {
+                    const s = await VideoEncoder.isConfigSupported({
+                        codec: c,
+                        width: REEL_W,
+                        height: REEL_H,
+                        bitrate: REEL_BITRATE,
+                        framerate: REEL_FPS
+                    });
+                    if (s.supported) {
+                        codec = c;
+                        break;
+                    }
+                } catch (_) {
+                    // Try next codec candidate.
+                }
+            }
+
+            muxer = new Mp4Muxer.Muxer({
+                target: new Mp4Muxer.ArrayBufferTarget(),
+                video: { codec: 'avc', width: REEL_W, height: REEL_H },
+                fastStart: 'in-memory'
+            });
+
+            encoder = new VideoEncoder({
+                output: (chunk, meta) => {
+                    if (!encoderErrorMessage) muxer.addVideoChunk(chunk, meta);
+                },
+                error: (e) => {
+                    encoderErrorMessage = e?.message || 'Unknown encoding error';
+                }
+            });
+
+            const baseEncoderConfig = {
+                codec,
+                width: REEL_W,
+                height: REEL_H,
+                bitrate: REEL_BITRATE,
+                framerate: REEL_FPS,
+                bitrateMode: 'constant',
+                latencyMode: 'quality'
+            };
+            let configured = false;
+            for (const accel of ['prefer-hardware', 'prefer-software']) {
+                try {
+                    encoder.configure({ ...baseEncoderConfig, hardwareAcceleration: accel });
+                    configured = true;
+                    break;
+                } catch (cfgErr) {
+                    console.warn(`Encoder configure failed (${accel}):`, cfgErr.message);
+                }
+            }
+            if (!configured) throw new Error('Could not configure H.264 encoder for 4K export.');
+
+            let accumCanvas = null;
+            let accumCtx = null;
             if (mbSamples > 0) {
-                accumCtx.clearRect(0, 0, REEL_W, REEL_H);
-                accumCtx.globalAlpha = 1.0 / mbSamples;
-                accumCtx.globalCompositeOperation = 'lighter';
-                for (let s = 0; s < mbSamples; s++) {
-                    const sub = Math.max(0, Math.min(1, progress + (s / mbSamples - 0.5) * (1 / totalFrames) * 0.8));
-                    applyCinemaState(sub, curve, segs, totalDur);
+                accumCanvas = document.createElement('canvas');
+                accumCanvas.width = REEL_W;
+                accumCanvas.height = REEL_H;
+                accumCtx = accumCanvas.getContext('2d', { willReadFrequently: false });
+                if (!accumCtx) throw new Error('Could not create motion-blur accumulation context.');
+                accumCtx.imageSmoothingEnabled = false;
+            }
+
+            const renderFrame = () => {
+                exportRenderer.clear();
+                exportRenderer.render(scene, camera);
+                if (_wmScene && _wmCamera) {
+                    exportRenderer.clearDepth();
+                    exportRenderer.render(_wmScene, _wmCamera);
+                }
+            };
+
+            const downsampleFrame = () => {
+                dsCtx.drawImage(exportRenderer.domElement, 0, 0, REEL_W, REEL_H);
+            };
+
+            for (let i = 0; i <= totalFrames; i++) {
+                if (lostDuringExport || exportRenderer.getContext().isContextLost()) {
+                    throw new Error('WebGL context lost during export.');
+                }
+                if (encoderErrorMessage) throw new Error(encoderErrorMessage);
+
+                const base = i / totalFrames;
+                const progress = loop === 'pingpong'
+                    ? (base <= 0.5 ? base * 2 : 2 - base * 2)
+                    : base;
+
+                if (mbSamples > 0) {
+                    accumCtx.clearRect(0, 0, REEL_W, REEL_H);
+                    accumCtx.globalAlpha = 1.0 / mbSamples;
+                    accumCtx.globalCompositeOperation = 'lighter';
+
+                    for (let s = 0; s < mbSamples; s++) {
+                        const sub = Math.max(0, Math.min(1, progress + (s / mbSamples - 0.5) * (1 / totalFrames) * 0.8));
+                        applyCinemaState(sub, curve, segs, totalDur);
+                        renderFrame();
+                        downsampleFrame();
+                        accumCtx.drawImage(dsCanvas, 0, 0);
+                    }
+
+                    const frame = new VideoFrame(accumCanvas, {
+                        timestamp: Math.round(i * 1e6 / REEL_FPS),
+                        alpha: 'discard'
+                    });
+                    encoder.encode(frame, { keyFrame: i % kfInterval === 0 });
+                    frame.close();
+                } else {
+                    applyCinemaState(progress, curve, segs, totalDur);
                     renderFrame();
                     downsampleFrame();
-                    accumCtx.drawImage(dsCanvas, 0, 0);
+
+                    const frame = new VideoFrame(dsCanvas, {
+                        timestamp: Math.round(i * 1e6 / REEL_FPS),
+                        alpha: 'discard'
+                    });
+                    encoder.encode(frame, { keyFrame: i % kfInterval === 0 });
+                    frame.close();
                 }
-                const f = new VideoFrame(accumCanvas, { timestamp: Math.round(i * 1e6 / REEL_FPS), alpha: 'discard' });
-                enc.encode(f, { keyFrame: i % kfInterval === 0 }); f.close();
-            } else {
-                applyCinemaState(progress, curve, segs, totalDur);
-                renderFrame();
-                downsampleFrame();
-                const f = new VideoFrame(dsCanvas, { timestamp: Math.round(i * 1e6 / REEL_FPS), alpha: 'discard' });
-                enc.encode(f, { keyFrame: i % kfInterval === 0 }); f.close();
+
+                while (encoder.encodeQueueSize >= 2) {
+                    if (encoderErrorMessage) throw new Error(encoderErrorMessage);
+                    await new Promise(r => setTimeout(r, 10));
+                }
+
+                if (i % 3 === 0 || i === totalFrames) {
+                    const pct = Math.round((i / totalFrames) * 100);
+                    progressBar.style.width = `${pct}%`;
+                    progressPct.textContent = `${pct}%`;
+                    const ssLabel = (ssW / REEL_W).toFixed(2).replace(/\.00$/, '');
+                    statusText.textContent =
+                        `Rendering frame ${i} / ${totalFrames} (${pct}%) · 4K ${aspectLabel} · SS${ssLabel} · ${codec}`;
+                }
+
+                await new Promise(r => setTimeout(r, 0));
             }
 
-            // Keep encoder queue shallow to avoid OOM on long exports
-            while (enc.encodeQueueSize >= 2) await new Promise(r => setTimeout(r, 10));
+            statusText.textContent = 'Finalizing MP4…';
+            await encoder.flush();
+            if (encoderErrorMessage) throw new Error(encoderErrorMessage);
+            encoder.close();
 
-            if (i % 3 === 0 || i === totalFrames) {
-                const pct = Math.round((i / totalFrames) * 100);
-                document.getElementById('render-progress-bar').style.width = `${pct}%`;
-                document.getElementById('render-progress-pct').textContent = `${pct}%`;
-                document.getElementById('render-status-text').textContent =
-                    `Rendering frame ${i} / ${totalFrames} (${pct}%) · 4K ${aspectLabel} · ${codec}`;
-            }
-            await new Promise(r => setTimeout(r, 0));
-        }
-
-        if (!encErr) {
-            document.getElementById('render-status-text').textContent = 'Finalizing MP4…';
-            await enc.flush();
-            enc.close();
             muxer.finalize();
+            muxerFinalized = true;
 
             const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
-            const url  = URL.createObjectURL(blob);
-            const a    = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
             a.style.display = 'none';
-            a.href     = url;
-            a.download = `DEM3D_4K_${aspectLabel.replace(':','x')}_Reel_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp4`;
-            document.body.appendChild(a); a.click();
-            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
-        }
-
+            a.href = url;
+            a.download = `DEM3D_4K_${aspectLabel.replace(':', 'x')}_Reel_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
         } catch (exportError) {
             console.error('Reel export failed:', exportError);
-            alert(`Reel export failed: ${exportError.message}\n\nTry reducing detail level or disabling motion blur.`);
-        }
+            const details = String(exportError?.message || 'Unknown export error');
+            const maybeContextLoss = /context lost|out of memory|webgl/i.test(details);
+            if (maybeContextLoss) {
+                alert('Reel export failed: GPU memory limit reached during render.\n\nThe exporter now auto-runs extreme terrain at native 4K (stability mode). If this still fails, close other GPU-heavy tabs/apps and try again.');
+            } else {
+                alert(`Reel export failed: ${details}\n\nTry reducing detail level or disabling motion blur.`);
+            }
+        } finally {
+            exportRenderer.domElement.removeEventListener('webglcontextlost', onContextLost, false);
 
-        // Always restore state
-        scene.fog = prevFog;
-        camera.aspect = prevAspect;
-        camera.updateProjectionMatrix();
-        exportRenderer.dispose();
-        disposeWatermark();
-        isReelRendering = false;
-        document.getElementById('render-overlay').style.display = 'none';
-        document.getElementById('btn-render-reel').disabled = cinemaKeyframes.length < 2;
+            try {
+                if (encoder && encoder.state !== 'closed') encoder.close();
+            } catch (closeErr) {
+                console.warn('Encoder close warning:', closeErr.message);
+            }
+
+            if (muxer && !muxerFinalized) {
+                try {
+                    muxer.finalize();
+                } catch (_) {
+                    // Ignore finalize failures on aborted exports.
+                }
+            }
+
+            scene.fog = prevFog;
+            camera.aspect = prevAspect;
+            camera.updateProjectionMatrix();
+
+            exportRenderer.autoClear = oldAutoClear;
+            exportRenderer.shadowMap.enabled = oldShadowEnabled;
+            exportRenderer.shadowMap.type = oldShadowType;
+            exportRenderer.shadowMap.autoUpdate = oldShadowAutoUpdate;
+            exportRenderer.shadowMap.needsUpdate = oldShadowNeedsUpdate;
+            exportRenderer.setPixelRatio(oldPixelRatio);
+            exportRenderer.setSize(oldSize.x, oldSize.y, false);
+
+            disposeWatermark();
+            isReelRendering = false;
+            overlay.style.display = 'none';
+            renderButton.disabled = cinemaKeyframes.length < 2;
+        }
     }
 
     // --- Wire up Cinema UI events ---
