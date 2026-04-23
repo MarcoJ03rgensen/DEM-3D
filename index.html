@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>3D DEM Explorer</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="favicons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicons/favicon-16x16.png">
+    <link rel="manifest" href="favicons/site.webmanifest">
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; -webkit-user-select: none; }
         #canvas-container { width: 100%; height: 100vh; display: block; touch-action: none; }
@@ -407,33 +411,38 @@
         <label>1. Detail Level</label>
         <select id="resolution-selector">
             <option value="128">Low (Fast)</option>
-            <option value="256" selected>Medium</option>
-            <option value="512">High</option>
+            <option value="256">Medium</option>
+            <option value="512" selected>High</option>
             <option value="1024">Ultra (1M Polys)</option>
             <option value="2048">Hyper (4M Polys)</option>
             <option value="4096">Extreme (16M Polys)</option>
             <option value="8192">Extreme+ (64M Polys)</option>
             <option value="16384">Extreme++ (256M Polys)</option>
         </select>
-        <div id="stat-display">Res: 256x256</div>
+        <div id="stat-display">Res: 512x512</div>
     </div>
 
     <div class="control-group">
         <label>2. Source</label>
-        <label for="heightmap-upload" class="btn">📂 Upload GeoTIFF / Img</label>
-        <input type="file" id="heightmap-upload" accept=".tif, .tiff, image/png, image/jpeg, image/webp">
-        <button id="btn-random" class="btn btn-secondary">🎲 Generate Geo-World</button>
+        <label for="heightmap-upload" class="btn">📂 Upload GeoTIFF</label>
+        <input type="file" id="heightmap-upload" accept=".tif, .tiff">
     </div>
 
     <div class="control-group">
         <label>3. Rendering</label>
         <label>Color Style</label>
         <select id="texture-style">
-            <option value="nature" selected>Nature (Snow/Rock/Grass)</option>
-            <option value="scientific">Scientific (Atlas Colors)</option>
-            <option value="grayscale">Grayscale (Raw Height)</option>
+            <option value="grayscale" selected>Grayscale (Raw Height)</option>
             <option value="clay">Clay (Neutral)</option>
             <option value="heatmap">Heatmap (Detailed)</option>
+        </select>
+
+        <label style="margin-top:10px">Background Environment</label>
+        <select id="bg-style">
+            <option value="sky" selected>Sky Blue</option>
+            <option value="greenscreen">Greenscreen (Chroma Key)</option>
+            <option value="dark">Dark Mode</option>
+            <option value="light">Light Mode</option>
         </select>
 
         <label class="checkbox-label">
@@ -451,7 +460,6 @@
     <div class="control-group">
         <label>4. Exports</label>
         <button id="btn-export" class="btn btn-green">💾 3D Model (.glb)</button>
-        <button id="btn-export-dem" class="btn btn-orange" style="display:none">🗺️ Export GeoTIFF</button>
         <button id="btn-open-cinema" class="btn btn-instagram" style="margin-top:6px;">🎬 4K Reel Studio (9:16)</button>
     </div>
 </div>
@@ -602,7 +610,7 @@
     let currentWorldWidth = BASE_SIZE;
     let currentWorldDepth = BASE_SIZE;
     
-    let CHUNK_RES = 256; 
+    let CHUNK_RES = 512; 
     let HEIGHT_SCALE = 300; 
     
     // --- Globals ---
@@ -627,8 +635,6 @@
     };
 
     let activeGeoTiffImage = null; 
-    let activeImageSource = null; 
-    let isRandomGen = true; 
     
     let isMobile = false;
     let touchLookStartX = 0, touchLookStartY = 0;
@@ -690,7 +696,34 @@
         setupEvents();
         setupCinemaEvents();
         
-        generateAdvancedRandomTerrain();
+        loadExampleData();
+    }
+
+    async function loadExampleData() {
+        const loader = document.getElementById('loading-indicator');
+        loader.style.display = 'block';
+        document.getElementById('loading-msg').innerText = "Loading Example Data...";
+        document.getElementById('minimap-title').innerText = "ringborgcrop.tif";
+        try {
+            const response = await fetch('ringborgcrop.tif');
+            if (!response.ok) throw new Error("Failed to fetch ringborgcrop.tif");
+            const blob = await response.blob();
+            const tiff = await fromBlob(blob);
+            const image = await tiff.getImage();
+            activeGeoTiffImage = image;
+            const rawWidth = image.getWidth(); const rawHeight = image.getHeight();
+            currentAspect = rawWidth / rawHeight;
+            const fileDirectory = image.getFileDirectory();
+            const modelPixelScale = fileDirectory.ModelPixelScale;
+            demMetaData.rawWidth = rawWidth; demMetaData.rawHeight = rawHeight; demMetaData.hasMetadata = true;
+            if (modelPixelScale && modelPixelScale.length >= 1) demMetaData.pixelScaleX = modelPixelScale[0];
+            else demMetaData.pixelScaleX = 30; 
+            await reloadGeoTiff(image);
+        } catch (err) {
+            console.error(err);
+            alert("Error loading example data: " + err.message);
+            loader.style.display = 'none';
+        }
     }
 
     function setupEvents() {
@@ -719,6 +752,9 @@
         });
 
         controls.addEventListener('unlock', () => {
+            moveForward = false; moveBackward = false; moveLeft = false; moveRight = false;
+            moveUp = false; moveDown = false; isRunning = false;
+            
             if (isCinemaMode) {
                 // Restore cinema panel and show click-to-navigate prompt
                 document.getElementById('cinema-panel').style.opacity = '1';
@@ -750,6 +786,16 @@
             if(rawHeightData) buildTerrain(rawHeightData, window.terrainW, window.terrainH);
         });
 
+        document.getElementById('bg-style').addEventListener('change', (e) => {
+            let bgColor = 0x87CEEB; // default sky
+            if (e.target.value === 'greenscreen') bgColor = 0x00FF00;
+            else if (e.target.value === 'dark') bgColor = 0x111111;
+            else if (e.target.value === 'light') bgColor = 0xeeeeee;
+            
+            scene.background.setHex(bgColor);
+            scene.fog.color.setHex(bgColor);
+        });
+
         document.getElementById('btn-realistic').addEventListener('click', setRealisticScale);
         
         document.getElementById('flight-mode-toggle').addEventListener('click', toggleFlightMode);
@@ -759,17 +805,9 @@
             triggerReload();
         });
 
-        document.getElementById('btn-random').addEventListener('click', () => {
-            activeGeoTiffImage = null;
-            activeImageSource = null;
-            document.getElementById('minimap-title').innerText = "Random World";
-            generateAdvancedRandomTerrain();
-        });
-
         document.getElementById('heightmap-upload').addEventListener('change', handleFileUpload);
         
         document.getElementById('btn-export').addEventListener('click', exportGLB);
-        document.getElementById('btn-export-dem').addEventListener('click', exportGeoTIFF); 
 
         document.addEventListener('keydown', (e) => onKey(e, true));
         document.addEventListener('keyup', (e) => onKey(e, false));
@@ -826,7 +864,7 @@
              processedHeightData = new Float32Array(heights);
         }
 
-        const maxChunkVerts = 256;
+        const maxChunkVerts = 255;
         const segX = width - 1;
         const segY = height - 1;
         
@@ -878,22 +916,7 @@
                         const localIdx = iy * (currentSegX + 1) + ix;
                         vertices[localIdx * 3 + 1] = h * HEIGHT_SCALE;
 
-                        if (style === 'nature') {
-                            if (h < 0.15) color.setHex(0xe3c07f); 
-                            else if (h < 0.4) {
-                                color.setHex(0x567d46); 
-                                color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.05);
-                            } else if (h < 0.7) {
-                                color.setHex(0x5a5a5a); 
-                                color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.1);
-                            } else color.setHex(0xffffff); 
-                        } else if (style === 'scientific') {
-                            if (h < 0.2) color.setHex(0x004400).lerp(new THREE.Color(0x55aa55), h / 0.2); 
-                            else if (h < 0.4) color.setHex(0x55aa55).lerp(new THREE.Color(0xd2b48c), (h - 0.2) / 0.2);
-                            else if (h < 0.7) color.setHex(0xd2b48c).lerp(new THREE.Color(0x8b4513), (h - 0.4) / 0.3);
-                            else if (h < 0.9) color.setHex(0x8b4513).lerp(new THREE.Color(0x444444), (h - 0.7) / 0.2);
-                            else color.setHex(0x444444).lerp(new THREE.Color(0xffffff), (h - 0.9) / 0.1);
-                        } else if (style === 'grayscale') {
+                        if (style === 'grayscale') {
                             color.setScalar(h);
                         } else if (style === 'heatmap') {
                             // Detailed heatmap: blue -> cyan -> green -> yellow -> red -> magenta
@@ -988,97 +1011,6 @@
         }, 100);
     }
 
-    // --- Custom GeoTIFF Writer ---
-    function exportGeoTIFF() {
-        if(!rawHeightData) return;
-        
-        const width = window.terrainW;
-        const height = window.terrainH;
-        const values = new Float32Array(width * height);
-        
-        const minH = demMetaData.min || 0;
-        const maxH = demMetaData.max || 800; 
-        const range = maxH - minH;
-        
-        for(let i=0; i<rawHeightData.length; i++) {
-            values[i] = rawHeightData[i] * range + minH;
-        }
-
-        const headerSize = 8;
-        const ifdEntries = 13;
-        const ifdSize = 2 + (ifdEntries * 12) + 4;
-        const bitsPerSampleVal = 32;
-        const stripByteCountsVal = width * height * 4;
-        
-        const ifdOffset = headerSize;
-        // Fix byte alignment padding
-        let dataOffset = ifdOffset + ifdSize;
-        const padding = (4 - (dataOffset % 4)) % 4;
-        dataOffset += padding;
-
-        const metaValuesSize = 80;
-        const valuesOffset = dataOffset + stripByteCountsVal; 
-        
-        const totalSize = valuesOffset + metaValuesSize;
-        const buffer = new ArrayBuffer(totalSize);
-        const view = new DataView(buffer);
-        
-        view.setUint16(0, 0x4949, true); 
-        view.setUint16(2, 42, true);     
-        view.setUint32(4, ifdOffset, true); 
-
-        let p = ifdOffset;
-        view.setUint16(p, ifdEntries, true); p += 2;
-
-        function writeTag(tag, type, count, valueOrOffset) {
-            view.setUint16(p, tag, true); p += 2;
-            view.setUint16(p, type, true); p += 2;
-            view.setUint32(p, count, true); p += 4;
-            view.setUint32(p, valueOrOffset, true); p += 4;
-        }
-
-        writeTag(256, 3, 1, width);
-        writeTag(257, 3, 1, height); 
-        writeTag(258, 3, 1, 32); 
-        writeTag(259, 3, 1, 1); 
-        writeTag(262, 3, 1, 1); 
-        writeTag(273, 4, 1, dataOffset);
-        writeTag(277, 3, 1, 1); 
-        writeTag(278, 3, 1, height); 
-        writeTag(279, 4, 1, stripByteCountsVal);
-        writeTag(339, 3, 1, 3); 
-        
-        const scaleOffset = valuesOffset;
-        const tieOffset = scaleOffset + 24;
-        const geoKeyOffset = tieOffset + 48;
-        
-        writeTag(33550, 12, 3, scaleOffset); 
-        writeTag(33551, 12, 6, tieOffset);   
-        writeTag(34735, 3, 4, geoKeyOffset); 
-
-        view.setUint32(p, 0, true); 
-
-        const floatView = new Float32Array(buffer, dataOffset, width * height);
-        floatView.set(values);
-
-        view.setFloat64(scaleOffset, 1.0, true);
-        view.setFloat64(scaleOffset + 8, 1.0, true);
-        view.setFloat64(scaleOffset + 16, 0.0, true);
-
-        for(let i=0; i<6; i++) view.setFloat64(tieOffset + i*8, 0.0, true);
-
-        view.setUint16(geoKeyOffset, 1, true);
-        view.setUint16(geoKeyOffset + 2, 1, true);
-        view.setUint16(geoKeyOffset + 4, 0, true);
-        view.setUint16(geoKeyOffset + 6, 0, true);
-
-        const blob = new Blob([buffer], { type: 'image/tiff' });
-        const link = document.createElement('a');
-        link.download = 'generated_terrain.tif';
-        link.href = URL.createObjectURL(blob);
-        link.click();
-    }
-
     // --- Physics & Util ---
 
     function getTerrainHeight(x, z) {
@@ -1120,19 +1052,37 @@
     }
 
     function smoothHeights(heights, width, height) {
+        // Dynamic blur radius based on detail level
+        const radius = Math.max(1, Math.floor(width / 256));
+        const temp = new Float32Array(heights.length);
         const newHeights = new Float32Array(heights.length);
+
+        // Horizontal pass
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 let sum = 0;
                 let count = 0;
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        const nx = x + dx;
-                        const ny = y + dy;
-                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                            sum += heights[ny * width + nx];
-                            count++;
-                        }
+                for (let dx = -radius; dx <= radius; dx++) {
+                    const nx = x + dx;
+                    if (nx >= 0 && nx < width) {
+                        sum += heights[y * width + nx];
+                        count++;
+                    }
+                }
+                temp[y * width + x] = sum / count;
+            }
+        }
+
+        // Vertical pass
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let sum = 0;
+                let count = 0;
+                for (let dy = -radius; dy <= radius; dy++) {
+                    const ny = y + dy;
+                    if (ny >= 0 && ny < height) {
+                        sum += temp[ny * width + x];
+                        count++;
                     }
                 }
                 newHeights[y * width + x] = sum / count;
@@ -1211,71 +1161,17 @@
         return value / maxValue; 
     }
 
-    function generateAdvancedRandomTerrain() {
-        isRandomGen = true;
-        document.getElementById('btn-export-dem').style.display = 'inline-block';
-        currentAspect = 1.0;
-        demMetaData.hasMetadata = false; demMetaData.min = 0; demMetaData.max = 800; 
-        
-        const width = CHUNK_RES;
-        const height = CHUNK_RES;
-        const size = width * height;
-        const data = new Float32Array(size);
-        const perlin = new ImprovedNoise();
-        const z = Math.random() * 1000;
-        let minH = Infinity, maxH = -Infinity;
-
-        for (let i = 0; i < size; i++) {
-            const x = i % width;
-            const y = ~~(i / width);
-            const nx = (x / width);
-            const ny = (y / height);
-
-            let base = 0; let amp = 1; let freq = 1.5;
-            for(let k=0; k<2; k++) { base += perlin.noise(nx * freq, ny * freq, z) * amp; amp *= 0.5; freq *= 2; }
-            base = Math.pow(base * 0.5 + 0.5, 1.5);
-
-            let ridge = 0; amp = 1.2; freq = 3.5;
-            for(let k=0; k<5; k++) {
-                let n = perlin.noise(nx * freq, ny * freq, z + 50.5);
-                n = 1.0 - Math.abs(n); n = n * n;
-                ridge += n * amp; amp *= 0.5; freq *= 2.0;
-            }
-            let h = Math.pow(base * 0.5 + (ridge * base) * 0.5, 1.6);
-            data[i] = h;
-            if(h < minH) minH = h;
-            if(h > maxH) maxH = h;
-        }
-        const range = maxH - minH;
-        for(let i=0; i<size; i++) data[i] = (data[i] - minH) / range;
-
-        // Minimap
-        const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d'); const imgData = ctx.createImageData(width, height);
-        for (let i = 0; i < size; i++) {
-             const val = Math.floor(data[i] * 255); const idx = i * 4;
-             imgData.data[idx] = val; imgData.data[idx+1] = val; imgData.data[idx+2] = val; imgData.data[idx+3] = 255;
-        }
-        ctx.putImageData(imgData, 0, 0);
-        document.getElementById('minimap-img').src = canvas.toDataURL();
-        document.getElementById('stat-display').innerText = `Res: ${width}x${height} | Ratio: 1.00`;
-
-        rawHeightData = data;
-        buildTerrain(data, width, height);
-    }
-
     // Include existing file/image logic...
     async function handleFileUpload(event) {
         const file = event.target.files[0]; if (!file) return;
         const loader = document.getElementById('loading-indicator'); loader.style.display = 'block';
         const name = file.name.toLowerCase(); document.getElementById('minimap-title').innerText = file.name;
-        isRandomGen = false; document.getElementById('btn-export-dem').style.display = 'none';
 
         try {
             if (name.endsWith('.tif') || name.endsWith('.tiff')) {
                 const tiff = await fromBlob(file);
                 const image = await tiff.getImage();
-                activeGeoTiffImage = image; activeImageSource = null;
+                activeGeoTiffImage = image;
                 const rawWidth = image.getWidth(); const rawHeight = image.getHeight();
                 currentAspect = rawWidth / rawHeight;
                 const fileDirectory = image.getFileDirectory();
@@ -1285,20 +1181,8 @@
                 else demMetaData.pixelScaleX = 30; 
                 await reloadGeoTiff(image);
             } else {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const img = new Image();
-                    img.onload = function() {
-                        activeImageSource = img; activeGeoTiffImage = null;
-                        currentAspect = img.width / img.height;
-                        demMetaData.rawWidth = img.width; demMetaData.rawHeight = img.height;
-                        demMetaData.hasMetadata = false; demMetaData.min = 0; demMetaData.max = 255; 
-                        document.getElementById('minimap-img').src = img.src; 
-                        generateFromImage(img); loader.style.display = 'none';
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
+                alert("Only GeoTIFF files (.tif, .tiff) are supported.");
+                loader.style.display = 'none';
             }
         } catch (err) { console.error(err); alert("Error: " + err.message); loader.style.display = 'none'; }
     }
@@ -1520,29 +1404,11 @@
         loader.style.display = 'none';
     }
 
-    function generateFromImage(image) {
-        const loader = document.getElementById('loading-indicator');
-        let w, h;
-        if (currentAspect >= 1) { w = CHUNK_RES; h = Math.round(CHUNK_RES / currentAspect); } 
-        else { h = CHUNK_RES; w = Math.round(CHUNK_RES * currentAspect); }
-        document.getElementById('stat-display').innerText = `Res: ${w}x${h} | Ratio: ${currentAspect.toFixed(2)}`;
-        const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0, w, h); 
-        const imgData = ctx.getImageData(0, 0, w, h); const data = imgData.data;
-        const heights = new Float32Array(w * h);
-        for (let i = 0, j = 0; i < heights.length; i++, j += 4) { heights[i] = data[j] / 255; }
-        rawHeightData = heights;
-        buildTerrain(heights, w, h);
-        loader.style.display = 'none';
-    }
-
     function triggerReload() {
         const loader = document.getElementById('loading-indicator');
         loader.style.display = 'block'; document.getElementById('loading-msg').innerText = "Re-sampling data...";
         setTimeout(() => {
             if(activeGeoTiffImage) reloadGeoTiff(activeGeoTiffImage);
-            else if(activeImageSource) generateFromImage(activeImageSource);
-            else generateAdvancedRandomTerrain();
             loader.style.display = 'none';
         }, 100);
     }
@@ -2108,9 +1974,19 @@
             const terrainH = getTerrainHeight(playerPos.x, playerPos.z);
             const eyeHeight = 15;
 
-            if (playerPos.y < terrainH + eyeHeight) {
+            if (playerPos.y <= terrainH + eyeHeight) {
+                // Ground collision resolution with an easing factor to reduce stutter
                 velocity.y = Math.max(0, velocity.y);
-                playerPos.y = terrainH + eyeHeight;
+                const targetY = terrainH + eyeHeight;
+                const diff = targetY - playerPos.y;
+                
+                // smoothly ease to target depending on frame delta, or snap if difference is large
+                if (Math.abs(diff) > 20) {
+                    playerPos.y = targetY;
+                } else {
+                    playerPos.y += diff * (delta * 15.0); // smooth approach
+                }
+                
                 canJump = true;
             }
             playerPos.y += velocity.y * delta;

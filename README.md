@@ -1,6 +1,6 @@
 # 3D DEM Explorer V4.5
 
-A high-performance web-based 3D Digital Elevation Model (DEM) viewer with advanced terrain visualization, flight mode, and support for massive GeoTIFF files.
+A  web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
 
 ![Version](https://img.shields.io/badge/version-4.5-blue)
 ![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-green)
@@ -8,27 +8,30 @@ A high-performance web-based 3D Digital Elevation Model (DEM) viewer with advanc
 ## 🌟 Features
 
 ### Core Capabilities
-- **🗺️ Multi-Format Support**: Upload GeoTIFF (.tif/.tiff) files or standard images (PNG, JPEG, WebP)
-- **🚀 Massive File Handling**: Process DEMs up to 15GB+ using intelligent tiled streaming
+- **🗺️ GeoTIFF**: Upload and instantly visualize GeoTIFF (.tif/.tiff) elevation files
+- **🚀 Massive File Handling**: Process DEMs using intelligent tiled streaming
 - **🎨 Multiple Visualization Styles**:
-  - Nature (Snow/Rock/Grass)
-  - Scientific (Atlas Colors)
-  - Grayscale (Raw Height)
+  - Grayscale (Raw Height - Default)
   - Clay (Neutral)
   - Heatmap (Detailed elevation gradient)
+- **🖼️ Configurable Environments**:
+  - Sky Blue
+  - Greenscreen (Chroma Key) - for the recording feature and the picture feature
+  - Dark Mode
+  - Light Mode
 - **🎮 Dual Navigation Modes**:
-  - Ground mode with realistic physics and collision detection
+  - Ground mode with smoothed, collision-detected physics
   - Flight mode for aerial exploration
 - **📐 Realistic Scaling**: Automatic 1:1 scale calculation from GeoTIFF metadata
 - **💾 Export Options**:
   - 3D models (.glb format)
-  - Procedurally generated terrains as GeoTIFF
+  - 4K Reel Studio (9:16 MP4 export)
+  - Picture export
 
 ### Technical Highlights
-- **Chunked Rendering**: Efficiently handles millions of polygons (up to 16M at Extreme detail)
-- **Adaptive Memory Management**: Automatic downsampling and tiled reading for large files
-- **Real-time Terrain Collision**: Accurate height-based physics
-- **Conditional Water Rendering**: Water only appears where elevation data indicates
+- **Chunked Rendering**: Can handle millions of polygons - the higher the detail level, the more polygons. (This will eventually require a backend for smooth rendering since currently it is fully local)
+- **Adaptive Precision Smoothing**: Dynamic kernel averaging based on active resolution
+- **Smooth Terrain Collision**: Easing-based physics to absorb sharp elevation changes
 - **Mobile Optimized**: Touch controls with virtual joystick and look controls
 
 ## 🎮 Controls
@@ -48,20 +51,12 @@ A high-performance web-based 3D Digital Elevation Model (DEM) viewer with advanc
 - **UP Button**: Jump (ground) / Ascend (flight)
 - **DOWN Button**: Descend (flight mode only)
 
-## 🚀 Quick Start
-
-1. Open `index.html` in a modern web browser (Chrome, Firefox, Edge, Safari)
-2. Click "Click to Start" to enable controls
-3. Choose your terrain source:
-   - **Upload GeoTIFF/Image**: Use your own elevation data
-   - **Generate Geo-World**: Create a procedural terrain
-
 ### Recommended Settings for Large DEMs
-- Start with **Medium** (256x256) resolution
+- Application defaults to **High** (512x512) resolution. Drop to Medium/Low for very old hardware
 - For files >5GB, use **Low** or **Medium** detail levels
 - Enable **Flight Mode** (`F` key) for better overview of large terrains
 
-## 📊 Detail Levels
+## 📊 Detail Levels (High detail level requires more processing power and memory)
 
 | Level | Resolution | Polygons | Best For |
 |-------|-----------|----------|----------|
@@ -75,19 +70,17 @@ A high-performance web-based 3D Digital Elevation Model (DEM) viewer with advanc
 ## 🛠️ Technical Architecture
 
 ### Memory Management
-- **Small Files (<100M pixels)**: Direct resampling with fallback mechanism
+- **Direct Resampling**: Optimized array-driven reading
 - **Large Files (>100M pixels)**: Tiled streaming approach
   - Reads 512×512 tiles sequentially
-  - Two-pass processing (sampling for min/max, then full read)
   - Progressive UI updates to prevent freezing
 
 ### Visualization Pipeline
-1. **Data Loading**: GeoTIFF parsing or image conversion
-2. **Normalization**: Height values mapped to 0-1 range
-3. **Smoothing** (optional): 3×3 kernel averaging
-4. **Geometry Generation**: Chunked mesh creation (256×256 vertex chunks)
-5. **Vertex Coloring**: Style-based color assignment per vertex
-6. **Water Detection**: Automatic placement if elevation < 15% threshold
+1. **Data Loading**: GeoTIFF parsing via explicit file type checks
+2. **Normalization**: Height values uniformly mapped
+3. **Adaptive Smoothing** (optional): Resolution-aware blur kernels
+4. **Geometry Generation**: Chunked mesh generation specifically aligned for 16-bit WebGL buffers
+5. **Vertex Coloring**: Dynamic gradient material assignments
 
 ### Performance Optimizations
 - Frustum culling on mesh chunks
@@ -98,15 +91,13 @@ A high-performance web-based 3D Digital Elevation Model (DEM) viewer with advanc
 ## 📁 File Format Support
 
 ### Input Formats
-- **GeoTIFF** (.tif, .tiff): Full metadata support including:
-  - Pixel scale (meters per pixel)
-  - Geographic coordinates
-  - Elevation min/max values
-- **Standard Images** (.png, .jpg, .webp): Grayscale interpreted as elevation
+- **GeoTIFF** (.tif, .tiff): Dedicated geographic elevation parser extracting:
+  - Pixel scales and real-world dimensions
+  - True geographic elevations and normalized limits
 
 ### Output Formats
-- **GLB** (GL Transmission Format): 3D terrain mesh with vertex colors
-- **GeoTIFF**: Procedurally generated terrains (from random generation only)
+- **GLB** (GL Transmission Format): 3D terrain mesh exported globally
+- **MP4 Reels**: Instagram/TikTok-ready 9:16 format cinematic 4K exports
 
 ## 🌐 Browser Compatibility
 
@@ -124,38 +115,32 @@ A high-performance web-based 3D Digital Elevation Model (DEM) viewer with advanc
 
 ## 🎨 Color Schemes Explained
 
-### Nature
-- **Sand** (0-15%): Beach/lowland areas
-- **Grass** (15-40%): Vegetation zones with subtle variation
-- **Rock** (40-70%): Mountain slopes with random darkness
-- **Snow** (70-100%): High peaks
+### Grayscale (Heightmap)
+Pure representation mapping minimum elevations to black and maximum peaks directly to white, optimal for accurate scientific topological analyses.
 
 ### Heatmap
 - **Blue** (0-20%): Lowest elevations
 - **Cyan** (20-40%): Low areas
 - **Green** (40-60%): Mid elevations
 - **Yellow** (60-80%): High terrain
-- **Red** (80-90%): Very high peaks
+- **Red** (80-90%): Higher terrain
 - **Magenta** (90-100%): Maximum elevation
 
-## 🔧 Advanced Features
+## 🔧 Other Features
 
 ### Realistic Scale Mode
-When using GeoTIFF files with proper metadata:
-1. Click "Set Realistic (1:1) Scale"
-2. Terrain will automatically adjust vertical exaggeration to match real-world proportions
-3. Displays actual width in kilometers and height range in meters
 
-### Procedural Terrain Generation
-- Uses multi-octave Perlin noise with ridge filtering
-- Combines base terrain with mountain ridge features
-- Exports as standard GeoTIFF with 0-800m elevation range
+1. Click "Set Realistic (1:1) Scale"
+2. Terrain will automatically reference original real-world metadata constraints
+3. Exaggerates bounding proportions precisely corresponding to horizontal distances
+
+### Multiple Background Contexts
+Toggle between the standard Sky environment, a dedicated Greenscreen (Chroma Key) space for video editors, and Dark/Light minimalist backdrops directly from the Rendering panel.
 
 ## 📝 Known Limitations
 
 - Very large DEMs (>20GB) may require multiple minutes to load
 - Export size limited by browser memory (~500MB for GLB files)
-- Water plane is global (doesn't follow complex coastlines)
 - No support for multi-band GeoTIFF (only first band used)
 
 ## 🤝 Contributing
@@ -174,7 +159,7 @@ This work is licensed under the Creative Commons Attribution-NonCommercial 4.0 I
 **You are free to:**
 - ✅ Use the code for personal, educational, or research purposes
 - ✅ Modify and build upon this work
-- ✅ Share and redistribute the code
+- ✅ Share and redistribute the code in a non commercial setting
 - ✅ Use terrain visualizations and exports created with this tool for any purpose
 
 **Under the following terms:**
