@@ -735,6 +735,7 @@
     let terrainGroup = null;
     
     let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let joyMoveX = 0, joyMoveY = 0;
     let canJump = false, isRunning = false;
     let moveUp = false, moveDown = false;
     let flightMode = false;
@@ -755,7 +756,6 @@
     
     let isMobile = false;
     let touchLookStartX = 0, touchLookStartY = 0;
-    let cameraPitch = 0; 
 
     let currentAspect = 1.0; 
 
@@ -889,6 +889,7 @@
 
         controls.addEventListener('unlock', () => {
             moveForward = false; moveBackward = false; moveLeft = false; moveRight = false;
+            joyMoveX = 0; joyMoveY = 0;
             moveUp = false; moveDown = false; isRunning = false;
             
             if (isCinemaMode) {
@@ -1808,11 +1809,15 @@
                         dy = (dy / distance) * joyMaxDist;
                     }
                     knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-                    // Dead zone of 8px for precision
-                    moveForward  = dy < -8;
-                    moveBackward = dy > 8;
-                    moveLeft     = dx < -8;
-                    moveRight    = dx > 8;
+                    
+                    if (distance > 8) {
+                        joyMoveX = dx / joyMaxDist;
+                        joyMoveY = dy / joyMaxDist;
+                    } else {
+                        joyMoveX = 0;
+                        joyMoveY = 0;
+                    }
+                    
                     // Proportional speed: farther from center = faster (via isRunning)
                     isRunning = distance > joyMaxDist * 0.75;
                 }
@@ -1823,7 +1828,8 @@
             joyTouchId = null;
             knob.style.transform = 'translate(-50%, -50%)';
             knob.classList.remove('active');
-            moveForward = moveBackward = moveLeft = moveRight = false;
+            joyMoveX = 0;
+            joyMoveY = 0;
             isRunning = false;
         };
         joystickZone.addEventListener('touchend', resetJoystick);
@@ -1893,6 +1899,7 @@
             }
         }, { passive: true });
 
+        const lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
         document.addEventListener('touchmove', (e) => {
             if (lookTouchId === null) return;
             for (let i = 0; i < e.changedTouches.length; i++) {
@@ -1900,10 +1907,13 @@
                 if (t.identifier === lookTouchId) {
                     const deltaX = t.clientX - lookStartX;
                     const deltaY = t.clientY - lookStartY;
-                    controls.getObject().rotation.y -= deltaX * lookSensitivity;
-                    cameraPitch -= deltaY * lookSensitivity;
-                    cameraPitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraPitch));
-                    camera.rotation.x = cameraPitch;
+                    
+                    lookEuler.setFromQuaternion(camera.quaternion);
+                    lookEuler.y -= deltaX * lookSensitivity;
+                    lookEuler.x -= deltaY * lookSensitivity;
+                    lookEuler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, lookEuler.x));
+                    camera.quaternion.setFromEuler(lookEuler);
+                    
                     lookStartX = t.clientX;
                     lookStartY = t.clientY;
                     break;
@@ -2442,15 +2452,17 @@
             velocity.z -= velocity.z * 8.0 * delta;
             velocity.y -= velocity.y * 8.0 * delta;
             
-            direction.z = Number(moveForward) - Number(moveBackward);
-            direction.x = Number(moveRight) - Number(moveLeft);
-            direction.y = Number(moveUp) - Number(moveDown);
-            direction.normalize();
+            let inputZ = Number(moveForward) - Number(moveBackward) - joyMoveY;
+            let inputX = Number(moveRight) - Number(moveLeft) + joyMoveX;
+            let inputY = Number(moveUp) - Number(moveDown);
+            
+            direction.set(inputX, inputY, inputZ);
+            if (direction.length() > 1) direction.normalize();
             
             const flightSpeed = isRunning ? 3000.0 : 1200.0;
-            if (moveForward || moveBackward) velocity.z -= direction.z * flightSpeed * delta;
-            if (moveLeft || moveRight) velocity.x -= direction.x * flightSpeed * delta;
-            if (moveUp || moveDown) velocity.y += direction.y * flightSpeed * delta;
+            if (inputZ !== 0) velocity.z -= direction.z * flightSpeed * delta;
+            if (inputX !== 0) velocity.x -= direction.x * flightSpeed * delta;
+            if (inputY !== 0) velocity.y += direction.y * flightSpeed * delta;
             
             controls.moveRight(-velocity.x * delta);
             controls.moveForward(-velocity.z * delta);
@@ -2467,13 +2479,15 @@
             velocity.z -= velocity.z * 10.0 * delta;
             velocity.y -= 9.8 * 100.0 * delta; 
 
-            direction.z = Number(moveForward) - Number(moveBackward);
-            direction.x = Number(moveRight) - Number(moveLeft);
-            direction.normalize(); 
+            let inputZ = Number(moveForward) - Number(moveBackward) - joyMoveY;
+            let inputX = Number(moveRight) - Number(moveLeft) + joyMoveX;
+            
+            direction.set(inputX, 0, inputZ);
+            if (direction.length() > 1) direction.normalize();
 
             const speed = isRunning ? 2000.0 : 800.0;
-            if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
-            if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+            if (inputZ !== 0) velocity.z -= direction.z * speed * delta;
+            if (inputX !== 0) velocity.x -= direction.x * speed * delta;
 
             controls.moveRight(-velocity.x * delta);
             controls.moveForward(-velocity.z * delta);
