@@ -573,7 +573,7 @@
 <div id="blocker">
     <div id="instructions">
         <h2>Click to Start</h2>
-        <p>Desktop: WASD to Move, Mouse to Look</p>
+        <p>Desktop: WASD to Move, Mouse to Look, P for 4K PNG</p>
         <p class="mobile-hint">Mobile: Left Joystick Move, Right Side Look</p>
     </div>
 </div>
@@ -653,6 +653,10 @@
 
     // Export constants
     const REEL_WIDTH = 2160, REEL_HEIGHT = 3840, REEL_FPS = 60, REEL_BITRATE = 80_000_000;
+    const PNG_EXPORT_LONG_EDGE = 3840;
+    const PNG_EXPORT_SUPERSAMPLE = 2;
+    const PNG_EXPORT_DPI = 300;
+    let isPngExporting = false;
 
     init();
     animate();
@@ -1011,6 +1015,179 @@
         }, 100);
     }
 
+    function isTypingInField() {
+        const active = document.activeElement;
+        if (!active) return false;
+        const tag = active.tagName;
+        return active.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    }
+
+    function get4kPngSize() {
+        const viewportW = Math.max(1, window.innerWidth);
+        const viewportH = Math.max(1, window.innerHeight);
+        const aspect = viewportW / viewportH;
+
+        if (aspect >= 1) {
+            return {
+                width: PNG_EXPORT_LONG_EDGE,
+                height: Math.max(1, Math.round(PNG_EXPORT_LONG_EDGE / aspect))
+            };
+        }
+
+        return {
+            width: Math.max(1, Math.round(PNG_EXPORT_LONG_EDGE * aspect)),
+            height: PNG_EXPORT_LONG_EDGE
+        };
+    }
+
+    function _readU32BE(bytes, offset) {
+        return (
+            (bytes[offset] << 24) |
+            (bytes[offset + 1] << 16) |
+            (bytes[offset + 2] << 8) |
+            bytes[offset + 3]
+        ) >>> 0;
+    }
+
+    function _writeU32BE(bytes, offset, value) {
+        bytes[offset] = (value >>> 24) & 255;
+        bytes[offset + 1] = (value >>> 16) & 255;
+        bytes[offset + 2] = (value >>> 8) & 255;
+        bytes[offset + 3] = value & 255;
+    }
+
+    function _crc32(bytes, start, end) {
+        let crc = 0xffffffff;
+        for (let i = start; i < end; i++) {
+            crc ^= bytes[i];
+            for (let b = 0; b < 8; b++) {
+                const mask = -(crc & 1);
+                crc = (crc >>> 1) ^ (0xedb88320 & mask);
+            }
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    async function withPngDpiMetadata(blob, dpi) {
+        const data = new Uint8Array(await blob.arrayBuffer());
+        const pngSig = [137, 80, 78, 71, 13, 10, 26, 10];
+        if (data.length < 33) return blob;
+        for (let i = 0; i < pngSig.length; i++) {
+            if (data[i] !== pngSig[i]) return blob;
+        }
+
+        const firstChunkLen = _readU32BE(data, 8);
+        const firstChunkType = String.fromCharCode(data[12], data[13], data[14], data[15]);
+        if (firstChunkType !== 'IHDR') return blob;
+        const insertAt = 8 + 12 + firstChunkLen;
+        if (insertAt > data.length) return blob;
+
+        const ppm = Math.max(1, Math.round(dpi / 0.0254));
+
+        const physChunk = new Uint8Array(4 + 4 + 9 + 4);
+        _writeU32BE(physChunk, 0, 9);
+        physChunk[4] = 112; // p
+        physChunk[5] = 72;  // H
+        physChunk[6] = 89;  // Y
+        physChunk[7] = 115; // s
+        _writeU32BE(physChunk, 8, ppm);
+        _writeU32BE(physChunk, 12, ppm);
+        physChunk[16] = 1; // unit = meter
+        const crc = _crc32(physChunk, 4, 17);
+        _writeU32BE(physChunk, 17, crc);
+
+        const out = new Uint8Array(data.length + physChunk.length);
+        out.set(data.subarray(0, insertAt), 0);
+        out.set(physChunk, insertAt);
+        out.set(data.subarray(insertAt), insertAt + physChunk.length);
+        return new Blob([out], { type: 'image/png' });
+    }
+
+    async function exportUltraPng() {
+        if (isPngExporting || isReelRendering || !renderer || !camera || !scene) return;
+
+        isPngExporting = true;
+        const loader = document.getElementById('loading-indicator');
+        const msg = document.getElementById('loading-msg');
+        const previousDisplay = loader ? loader.style.display : 'none';
+        const previousMessage = msg ? msg.innerText : '';
+
+        if (loader) loader.style.display = 'block';
+        if (msg) msg.innerText = 'Rendering ultra-quality 4K PNG...';
+
+        const oldPixelRatio = renderer.getPixelRatio();
+        const oldSize = new THREE.Vector2();
+        renderer.getSize(oldSize);
+        const oldAspect = camera.aspect;
+
+        try {
+            const gl = renderer.getContext();
+            const maxEdge = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 8192;
+
+            const target = get4kPngSize();
+            let outputW = target.width;
+            let outputH = target.height;
+
+            const outputMaxEdge = Math.max(outputW, outputH);
+            if (outputMaxEdge > maxEdge) {
+                const scale = maxEdge / outputMaxEdge;
+                outputW = Math.max(1, Math.floor(outputW * scale));
+                outputH = Math.max(1, Math.floor(outputH * scale));
+            }
+
+            let supersample = Math.min(PNG_EXPORT_SUPERSAMPLE, maxEdge / Math.max(outputW, outputH));
+            if (!Number.isFinite(supersample) || supersample < 1) supersample = 1;
+
+            const renderW = Math.max(1, Math.floor(outputW * supersample));
+            const renderH = Math.max(1, Math.floor(outputH * supersample));
+
+            camera.aspect = outputW / outputH;
+            camera.updateProjectionMatrix();
+
+            renderer.setPixelRatio(1);
+            renderer.setSize(renderW, renderH, false);
+            renderer.render(scene, camera);
+
+            const outputCanvas = document.createElement('canvas');
+            outputCanvas.width = outputW;
+            outputCanvas.height = outputH;
+            const outputCtx = outputCanvas.getContext('2d', { alpha: false });
+            if (!outputCtx) throw new Error('Could not create export context.');
+            outputCtx.imageSmoothingEnabled = true;
+            outputCtx.imageSmoothingQuality = 'high';
+            outputCtx.drawImage(renderer.domElement, 0, 0, outputW, outputH);
+
+            const pngBlob = await new Promise((resolve) => outputCanvas.toBlob(resolve, 'image/png'));
+            if (!pngBlob) throw new Error('Browser could not encode PNG.');
+            const dpiPngBlob = await withPngDpiMetadata(pngBlob, PNG_EXPORT_DPI);
+
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            const url = URL.createObjectURL(dpiPngBlob);
+            const link = document.createElement('a');
+            link.style.display = 'none';
+            link.href = url;
+            link.download = `DEM3D_4K_PNG_${outputW}x${outputH}_${PNG_EXPORT_DPI}DPI_${timestamp}.png`;
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 100);
+        } catch (error) {
+            console.error(error);
+            alert(`PNG export failed: ${error.message}`);
+        } finally {
+            camera.aspect = oldAspect;
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(oldPixelRatio);
+            renderer.setSize(oldSize.x, oldSize.y, false);
+
+            if (msg) msg.innerText = previousMessage || 'Loading...';
+            if (loader) loader.style.display = previousDisplay || 'none';
+            isPngExporting = false;
+        }
+    }
+
     // --- Physics & Util ---
 
     function getTerrainHeight(x, z) {
@@ -1146,6 +1323,7 @@
             case 'KeyQ': if (flightMode) moveDown = isDown; break;
             case 'KeyE': if (flightMode) moveUp = isDown; break;
             case 'KeyF': if (isDown) toggleFlightMode(); break;
+            case 'KeyP': if (isDown && !event.repeat && !isTypingInField()) exportUltraPng(); break;
         }
     }
 
@@ -1214,7 +1392,13 @@
                 try {
                     if(attempt > 1) msg.innerText = `Retrying at ${attemptW}x${attemptH}...`;
                     if(attemptW < 2 || attemptH < 2) break; 
-                    rasters = await image.readRasters({ width: attemptW, height: attemptH });
+                    rasters = await image.readRasters({
+                        samples: [0],
+                        width: attemptW,
+                        height: attemptH,
+                        resampleMethod: 'bilinear',
+                        interleave: false
+                    });
                     if(rasters && rasters[0]) {
                         success = true; CHUNK_RES = Math.max(attemptW, attemptH);
                         readW = attemptW; readH = attemptH; break; 
@@ -1245,6 +1429,7 @@
         
         // Create output arrays
         const outputData = new Float32Array(targetWidth * targetHeight);
+        const outputCount = new Uint32Array(targetWidth * targetHeight);
         let globalMin = Infinity;
         let globalMax = -Infinity;
         
@@ -1330,8 +1515,9 @@
                                 const normalized = (val - globalMin) / range;
                                 const outputIdx = targetY * targetWidth + targetX;
                                 
-                                // Use max value if multiple source pixels map to same target
-                                outputData[outputIdx] = Math.max(outputData[outputIdx] || 0, normalized);
+                                // Average overlapping source samples to avoid synthetic ridge artifacts.
+                                outputData[outputIdx] += normalized;
+                                outputCount[outputIdx]++;
                             }
                         }
                     }
@@ -1351,6 +1537,10 @@
                     await new Promise(resolve => setTimeout(resolve, 0));
                 }
             }
+        }
+
+        for (let i = 0; i < outputData.length; i++) {
+            if (outputCount[i] > 0) outputData[i] /= outputCount[i];
         }
         
         msg.innerText = 'Generating preview...';
