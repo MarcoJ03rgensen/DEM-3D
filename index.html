@@ -587,7 +587,7 @@
     <div class="cp-section">
         <div id="kf-total">
             Total: <span id="kf-total-sec">0.0</span>s
-            <span id="kf-total-frames" style="font-size:0.68rem;opacity:0.55;display:block;margin-top:2px;">0 frames @ 60fps · 80 Mbps · 4K</span>
+            <span id="kf-total-frames" style="font-size:0.68rem;opacity:0.55;display:block;margin-top:2px;">0 frames @ 30fps · 35 Mbps · 4K</span>
         </div>
         <div class="cp-row">
             <span class="cp-label">Secs / Keyframe</span>
@@ -625,6 +625,14 @@
                 <option value="16">16 samples (slow)</option>
             </select>
         </div>
+        <div class="cp-row">
+            <span class="cp-label">Codec Preset</span>
+            <select id="cp-codec">
+                <option value="h264-compatible" selected>H.264 Compatible (Phone Safe)</option>
+                <option value="auto">Auto (HEVC -> H.264 fallback)</option>
+                <option value="h265-master">H.265 Master (HEVC)</option>
+            </select>
+        </div>
     </div>
 
     <div class="cp-section">
@@ -641,7 +649,7 @@
 
     <div class="cp-section">
         <button id="btn-render-reel" class="btn btn-instagram" disabled>🎬 Export 4K Reel (MP4)</button>
-        <div id="cp-export-specs" style="font-size:0.68rem;color:#888;margin-top:5px;text-align:center;">2160 × 3840 · 60 fps · 80 Mbps (H.264 L5.2)</div>
+        <div id="cp-export-specs" style="font-size:0.68rem;color:#888;margin-top:5px;text-align:center;">2160 × 3840 · 30 fps · 35 Mbps (H.264 Compatible)</div>
     </div>
 
     <div style="display:flex;gap:5px;margin-top:2px;">
@@ -768,7 +776,14 @@
     let cinemaReturnState = null;
 
     // Export constants
-    const REEL_FPS = 60, REEL_BITRATE = 80_000_000;
+    const REEL_FPS_MASTER = 60;
+    const REEL_FPS_COMPAT = 30;
+    const REEL_BITRATE_H264 = 35_000_000;
+    const REEL_BITRATE_H265 = 55_000_000;
+    const REEL_CODEC_CANDIDATES = {
+        hevc: ['hvc1.1.6.L186.B0', 'hev1.1.6.L186.B0', 'hvc1.1.6.L180.B0', 'hev1.1.6.L180.B0'],
+        avc:  ['avc1.640034', 'avc1.640033', 'avc1.4D4034', 'avc1.4D4033', 'avc1.4D002A', 'avc1.640032']
+    };
     const REEL_SUPERSAMPLE = 2; // render at 2x and downscale for PNG-grade sharpness
     const PNG_EXPORT_LONG_EDGE = 3840;
     const PNG_EXPORT_SUPERSAMPLE = 2;
@@ -794,6 +809,68 @@
 
         if (!Number.isFinite(supersample) || supersample < 1) return 1;
         return Math.max(1, supersample);
+    }
+
+    function getReelCodecMode() {
+        const sel = document.getElementById('cp-codec');
+        return sel ? sel.value : 'h264-compatible';
+    }
+
+    function getTargetReelBitrate(mode = getReelCodecMode()) {
+        return mode === 'h265-master' ? REEL_BITRATE_H265 : REEL_BITRATE_H264;
+    }
+
+    function getTargetReelFps(mode = getReelCodecMode()) {
+        return mode === 'h265-master' ? REEL_FPS_MASTER : REEL_FPS_COMPAT;
+    }
+
+    function getCodecUiLabel(mode = getReelCodecMode()) {
+        if (mode === 'h264-compatible') return 'H.264 Compatible';
+        if (mode === 'auto') return 'Auto';
+        return 'H.265 Master';
+    }
+
+    function getReelEncodeProfile(displayW, displayH) {
+        if (displayH > displayW) {
+            // Many mobile decoders reject 2160x3840 streams; encode 3840x2160 + rotation metadata instead.
+            return { encodeWidth: displayH, encodeHeight: displayW, rotation: 90 };
+        }
+        return { encodeWidth: displayW, encodeHeight: displayH, rotation: 0 };
+    }
+
+    function updateCinemaExportSpecs() {
+        const specs = document.getElementById('cp-export-specs');
+        if (!specs) return;
+
+        const { width: rw, height: rh } = getReelDimensions();
+        const mode = getReelCodecMode();
+        const fps = getTargetReelFps(mode);
+        const mbps = Math.round(getTargetReelBitrate(mode) / 1e6);
+        const encode = getReelEncodeProfile(rw, rh);
+        const codecLabel = mode === 'h264-compatible'
+            ? 'H.264 Compatible'
+            : (mode === 'auto' ? 'Auto codec (HEVC→H.264 fallback)' : 'H.265/HEVC Master');
+        const rotateNote = encode.rotation !== 0 ? ' · phone-safe orientation' : '';
+
+        specs.textContent = `${rw} × ${rh} · ${fps} fps · ${mbps} Mbps (${codecLabel})${rotateNote}`;
+    }
+
+    async function pickSupportedVideoCodec(candidates, width, height, bitrate, framerate) {
+        for (const codec of candidates) {
+            try {
+                const support = await VideoEncoder.isConfigSupported({
+                    codec,
+                    width,
+                    height,
+                    bitrate,
+                    framerate
+                });
+                if (support && support.supported) return codec;
+            } catch (_) {
+                // Try next codec candidate.
+            }
+        }
+        return null;
     }
 
     init();
@@ -2221,9 +2298,12 @@
         const display = loop === 'pingpong' ? total * 2 : total;
         const { width: rw, height: rh } = getReelDimensions();
         const aspectLabel = rw < rh ? '9:16' : '16:9';
+        const codecMode = getReelCodecMode();
+        const fps = getTargetReelFps(codecMode);
+        const bitrate = getTargetReelBitrate(codecMode);
         document.getElementById('kf-total-sec').textContent    = display.toFixed(1);
         document.getElementById('kf-total-frames').textContent =
-            `${Math.ceil(display * REEL_FPS)} frames @ ${REEL_FPS}fps · ${(REEL_BITRATE/1e6).toFixed(0)} Mbps · 4K ${aspectLabel}`;
+            `${Math.ceil(display * fps)} frames @ ${fps}fps · ${(bitrate/1e6).toFixed(0)} Mbps · 4K ${aspectLabel} · ${getCodecUiLabel(codecMode)}`;
     }
 
     // --- Curve & Progress Helpers ---
@@ -2432,32 +2512,71 @@
             const loop = document.getElementById('cp-loop').value;
             const mbSamples = parseInt(document.getElementById('cp-motionblur').value) || 0;
             const renderDurSec = loop === 'pingpong' ? totalDur * 2 : totalDur;
-            const totalFrames = Math.ceil(renderDurSec * REEL_FPS);
-            const kfInterval = REEL_FPS;
 
-            const codecs = ['avc1.640034', 'avc1.640033', 'avc1.4D4034', 'avc1.4D4033'];
-            let codec = 'avc1.640033';
-            for (const c of codecs) {
-                try {
-                    const s = await VideoEncoder.isConfigSupported({
-                        codec: c,
-                        width: REEL_W,
-                        height: REEL_H,
-                        bitrate: REEL_BITRATE,
-                        framerate: REEL_FPS
-                    });
-                    if (s.supported) {
-                        codec = c;
-                        break;
-                    }
-                } catch (_) {
-                    // Try next codec candidate.
+            const codecMode = getReelCodecMode();
+            const encodeProfile = getReelEncodeProfile(REEL_W, REEL_H);
+            const ENCODE_W = encodeProfile.encodeWidth;
+            const ENCODE_H = encodeProfile.encodeHeight;
+            const trackRotation = encodeProfile.rotation;
+
+            let encoderCodec = null;
+            let muxerVideoCodec = 'avc';
+            let codecLabel = 'H.264';
+            let targetFps = getTargetReelFps(codecMode);
+            let targetBitrate = getTargetReelBitrate(codecMode);
+            let fallbackNote = '';
+
+            if (codecMode !== 'h264-compatible') {
+                encoderCodec = await pickSupportedVideoCodec(
+                    REEL_CODEC_CANDIDATES.hevc,
+                    ENCODE_W,
+                    ENCODE_H,
+                    targetBitrate,
+                    targetFps
+                );
+                if (encoderCodec) {
+                    muxerVideoCodec = 'hevc';
+                    codecLabel = 'H.265/HEVC';
+                } else if (codecMode === 'h265-master') {
+                    fallbackNote = 'H.265 is unavailable in this browser/GPU, using H.264 compatibility fallback.';
                 }
             }
 
+            if (!encoderCodec) {
+                targetFps = Math.min(targetFps, REEL_FPS_COMPAT);
+                targetBitrate = REEL_BITRATE_H264;
+                encoderCodec = await pickSupportedVideoCodec(
+                    REEL_CODEC_CANDIDATES.avc,
+                    ENCODE_W,
+                    ENCODE_H,
+                    targetBitrate,
+                    targetFps
+                );
+                muxerVideoCodec = 'avc';
+                codecLabel = 'H.264';
+            }
+
+            if (!encoderCodec) {
+                throw new Error('No supported video codec found for this browser/device at current export settings.');
+            }
+
+            const totalFrames = Math.max(1, Math.ceil(renderDurSec * targetFps));
+            const kfInterval = Math.max(1, Math.round(targetFps));
+
+            if (fallbackNote) {
+                console.warn(fallbackNote);
+            }
+
+            if (trackRotation !== 0) {
+                console.info(`Using phone-safe orientation: encode ${ENCODE_W}x${ENCODE_H} with rotation ${trackRotation}.`);
+            }
+
+            const muxerVideo = { codec: muxerVideoCodec, width: ENCODE_W, height: ENCODE_H };
+            if (trackRotation !== 0) muxerVideo.rotation = trackRotation;
+
             muxer = new Mp4Muxer.Muxer({
                 target: new Mp4Muxer.ArrayBufferTarget(),
-                video: { codec: 'avc', width: REEL_W, height: REEL_H },
+                video: muxerVideo,
                 fastStart: 'in-memory'
             });
 
@@ -2471,11 +2590,11 @@
             });
 
             const baseEncoderConfig = {
-                codec,
-                width: REEL_W,
-                height: REEL_H,
-                bitrate: REEL_BITRATE,
-                framerate: REEL_FPS,
+                codec: encoderCodec,
+                width: ENCODE_W,
+                height: ENCODE_H,
+                bitrate: targetBitrate,
+                framerate: targetFps,
                 bitrateMode: 'constant',
                 latencyMode: 'quality'
             };
@@ -2489,7 +2608,7 @@
                     console.warn(`Encoder configure failed (${accel}):`, cfgErr.message);
                 }
             }
-            if (!configured) throw new Error('Could not configure H.264 encoder for 4K export.');
+            if (!configured) throw new Error(`Could not configure ${codecLabel} encoder for 4K export.`);
 
             let accumCanvas = null;
             let accumCtx = null;
@@ -2501,6 +2620,32 @@
                 if (!accumCtx) throw new Error('Could not create motion-blur accumulation context.');
                 accumCtx.imageSmoothingEnabled = false;
             }
+
+            const encCanvas = document.createElement('canvas');
+            encCanvas.width = ENCODE_W;
+            encCanvas.height = ENCODE_H;
+            const encCtx = encCanvas.getContext('2d', { alpha: false });
+            if (!encCtx) throw new Error('Could not create encoder frame context.');
+            encCtx.imageSmoothingEnabled = true;
+            encCtx.imageSmoothingQuality = 'high';
+
+            const frameCanvasForEncoding = (srcCanvas) => {
+                if (trackRotation === 0 && srcCanvas.width === ENCODE_W && srcCanvas.height === ENCODE_H) {
+                    return srcCanvas;
+                }
+                encCtx.setTransform(1, 0, 0, 1, 0, 0);
+                encCtx.clearRect(0, 0, ENCODE_W, ENCODE_H);
+                if (trackRotation === 90) {
+                    encCtx.translate(ENCODE_W / 2, ENCODE_H / 2);
+                    // Rotate opposite direction so track-rotation metadata produces upright portrait playback.
+                    encCtx.rotate(-Math.PI / 2);
+                    encCtx.drawImage(srcCanvas, -REEL_W / 2, -REEL_H / 2, REEL_W, REEL_H);
+                    encCtx.setTransform(1, 0, 0, 1, 0, 0);
+                } else {
+                    encCtx.drawImage(srcCanvas, 0, 0, ENCODE_W, ENCODE_H);
+                }
+                return encCanvas;
+            };
 
             const renderFrame = () => {
                 exportRenderer.clear();
@@ -2539,8 +2684,8 @@
                         accumCtx.drawImage(dsCanvas, 0, 0);
                     }
 
-                    const frame = new VideoFrame(accumCanvas, {
-                        timestamp: Math.round(i * 1e6 / REEL_FPS),
+                    const frame = new VideoFrame(frameCanvasForEncoding(accumCanvas), {
+                        timestamp: Math.round(i * 1e6 / targetFps),
                         alpha: 'discard'
                     });
                     encoder.encode(frame, { keyFrame: i % kfInterval === 0 });
@@ -2550,8 +2695,8 @@
                     renderFrame();
                     downsampleFrame();
 
-                    const frame = new VideoFrame(dsCanvas, {
-                        timestamp: Math.round(i * 1e6 / REEL_FPS),
+                    const frame = new VideoFrame(frameCanvasForEncoding(dsCanvas), {
+                        timestamp: Math.round(i * 1e6 / targetFps),
                         alpha: 'discard'
                     });
                     encoder.encode(frame, { keyFrame: i % kfInterval === 0 });
@@ -2568,8 +2713,9 @@
                     progressBar.style.width = `${pct}%`;
                     progressPct.textContent = `${pct}%`;
                     const ssLabel = (ssW / REEL_W).toFixed(2).replace(/\.00$/, '');
+                    const orientLabel = trackRotation !== 0 ? ` · Rot${trackRotation}` : '';
                     statusText.textContent =
-                        `Rendering frame ${i} / ${totalFrames} (${pct}%) · 4K ${aspectLabel} · SS${ssLabel} · ${codec}`;
+                        `Rendering frame ${i} / ${totalFrames} (${pct}%) · 4K ${aspectLabel} · ${targetFps}fps · SS${ssLabel} · ${codecLabel} · ${(targetBitrate / 1e6).toFixed(0)} Mbps${orientLabel}`;
                 }
 
                 await new Promise(r => setTimeout(r, 0));
@@ -2588,7 +2734,8 @@
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = `DEM3D_4K_${aspectLabel.replace(':', 'x')}_Reel_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp4`;
+            const codecTag = muxerVideoCodec === 'hevc' ? 'H265' : 'H264';
+            a.download = `DEM3D_4K_${aspectLabel.replace(':', 'x')}_Reel_${codecTag}_${targetFps}fps_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp4`;
             document.body.appendChild(a);
             a.click();
             setTimeout(() => {
@@ -2602,7 +2749,7 @@
             if (maybeContextLoss) {
                 alert('Reel export failed: GPU memory limit reached during render.\n\nThe exporter now auto-runs extreme terrain at native 4K (stability mode). If this still fails, close other GPU-heavy tabs/apps and try again.');
             } else {
-                alert(`Reel export failed: ${details}\n\nTry reducing detail level or disabling motion blur.`);
+                alert(`Reel export failed: ${details}\n\nTry the \"H.264 Compatible (Phone Safe)\" preset for maximum phone playback support.`);
             }
         } finally {
             exportRenderer.domElement.removeEventListener('webglcontextlost', onContextLost, false);
@@ -2651,6 +2798,10 @@
         document.getElementById('cp-pace').addEventListener('input', updateKfTotalTime);
         document.getElementById('cp-duration').addEventListener('input', updateKfTotalTime);
         document.getElementById('cp-loop').addEventListener('change', updateKfTotalTime);
+        document.getElementById('cp-codec').addEventListener('change', () => {
+            updateKfTotalTime();
+            updateCinemaExportSpecs();
+        });
 
         // Aspect ratio selector — update overlay, labels, specs
         document.getElementById('cp-aspect').addEventListener('change', (e) => {
@@ -2658,20 +2809,21 @@
             const overlay = document.getElementById('cinema-frame-overlay');
             const frameLabel = document.getElementById('cinema-frame-label');
             const badge = document.getElementById('cinema-format-badge');
-            const specs = document.getElementById('cp-export-specs');
             if (val === '16:9') {
                 overlay.className = 'orient-landscape';
                 frameLabel.textContent = '16:9 · 4K (3840×2160)';
                 badge.textContent = '16:9 Landscape';
-                specs.textContent = '3840 × 2160 · 60 fps · 80 Mbps (H.264)';
             } else {
                 overlay.className = 'orient-portrait';
                 frameLabel.textContent = '9:16 · 4K Reel (2160×3840)';
                 badge.textContent = '9:16 Portrait';
-                specs.textContent = '2160 × 3840 · 60 fps · 80 Mbps (H.264)';
             }
             updateKfTotalTime();
+            updateCinemaExportSpecs();
         });
+
+        updateKfTotalTime();
+        updateCinemaExportSpecs();
     }
 
     function animate() {
