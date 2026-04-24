@@ -355,6 +355,62 @@
             font-size: 0.7rem; color: #888; margin-top: 5px; font-family: monospace;
         }
 
+        /* ===== CHUNK LOADING TOAST ===== */
+        #chunk-toast {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(10, 10, 30, 0.92);
+            color: white;
+            padding: 14px 24px;
+            border-radius: 12px;
+            z-index: 55;
+            display: none;
+            text-align: center;
+            border: 1px solid rgba(74, 144, 226, 0.4);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 25px rgba(0,0,0,0.5);
+            transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s;
+            opacity: 0;
+            max-width: 90vw;
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+        #chunk-toast.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        #chunk-toast .toast-icon {
+            font-size: 1.3rem;
+            margin-right: 8px;
+        }
+        #chunk-toast .toast-title {
+            font-weight: 700;
+            color: #4a90e2;
+            font-size: 0.92rem;
+        }
+        #chunk-toast .toast-detail {
+            font-size: 0.78rem;
+            color: #aaa;
+            margin-top: 4px;
+        }
+        #chunk-progress-bar {
+            width: 100%;
+            height: 3px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        #chunk-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4a90e2, #42d392);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
         /* ===== CINEMA / 4K REEL MODE ===== */
         #cinema-panel {
             position: absolute;
@@ -707,6 +763,13 @@
     <div id="mobile-flight-btn" class="mobile-action-btn">✈️</div>
 </div>
 
+<!-- Chunk loading toast notification -->
+<div id="chunk-toast">
+    <div><span class="toast-icon">🧩</span><span class="toast-title">Spatial Chunking Active</span></div>
+    <div id="chunk-toast-msg" class="toast-detail">Loading terrain in high-detail chunks...</div>
+    <div id="chunk-progress-bar"><div id="chunk-progress-fill"></div></div>
+</div>
+
 <div id="canvas-container"></div>
 
 <script src="https://unpkg.com/mp4-muxer@3.0.0/build/mp4-muxer.js"></script>
@@ -726,7 +789,7 @@
     import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
     import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
     import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
-    import { fromBlob } from 'geotiff';
+    import { fromBlob, Pool } from 'geotiff';
 
     // --- Configuration ---
     const BASE_SIZE = 2000; 
@@ -755,7 +818,7 @@
     
     let demMetaData = {
         min: 0, max: 100, rawWidth: 100, rawHeight: 100,
-        pixelScaleX: 1, hasMetadata: false
+        pixelScaleX: 1, hasMetadata: false, noDataValue: null
     };
 
     let activeGeoTiffImage = null; 
@@ -764,6 +827,19 @@
     let touchLookStartX = 0, touchLookStartY = 0;
 
     let currentAspect = 1.0; 
+
+    // --- Spatial Chunking System ---
+    let chunkingEnabled = false;
+    let chunkGrid = null;         // { chunksX, chunksY, chunkPixelsX, chunkPixelsY, sourceW, sourceH }
+    let loadedChunks = new Map();  // key "cx,cy" -> { meshes: [], heightData, offsetX, offsetY, w, h }
+    let chunkLoadQueue = [];
+    let isChunkLoading = false;
+    let chunkToastTimeout = null;
+    let lastChunkCheckTime = 0;
+    const CHUNK_CHECK_INTERVAL = 500; // ms between proximity checks
+    const CHUNK_LOAD_RADIUS = 1;    // Load chunks within this many chunk-widths of camera (e.g., 1 = 3x3 grid)
+    const CHUNK_UNLOAD_RADIUS = 2;  // Unload chunks outside this radius
+    let lastPlayerChunkX = -1, lastPlayerChunkY = -1;
 
     // --- Cinema / 4K Reel Export ---
     let isCinemaMode = false;
@@ -943,6 +1019,7 @@
             demMetaData.rawWidth = rawWidth; demMetaData.rawHeight = rawHeight; demMetaData.hasMetadata = true;
             if (modelPixelScale && modelPixelScale.length >= 1) demMetaData.pixelScaleX = modelPixelScale[0];
             else demMetaData.pixelScaleX = 30; 
+            demMetaData.noDataValue = fileDirectory.GDAL_NODATA ? parseFloat(fileDirectory.GDAL_NODATA) : null;
             await reloadGeoTiff(image);
         } catch (err) {
             console.error(err);
@@ -999,17 +1076,27 @@
             ui.style.display = (ui.style.display === 'none') ? 'block' : 'none';
         });
 
+        let rebuildTimeout = null;
         document.getElementById('height-scale').addEventListener('input', (e) => {
             HEIGHT_SCALE = parseInt(e.target.value);
-            updateTerrainGeometry();
+            if (chunkingEnabled) {
+                if (rebuildTimeout) clearTimeout(rebuildTimeout);
+                rebuildTimeout = setTimeout(rebuildAllChunkMeshes, 150);
+            } else {
+                updateTerrainGeometry();
+            }
         });
 
         document.getElementById('btn-smooth').addEventListener('change', () => {
-            if(rawHeightData) buildTerrain(rawHeightData, window.terrainW, window.terrainH);
+            if (chunkingEnabled) {
+                rebuildAllChunkMeshes();
+            } else if(rawHeightData) buildTerrain(rawHeightData, window.terrainW, window.terrainH);
         });
 
         document.getElementById('texture-style').addEventListener('change', () => {
-            if(rawHeightData) buildTerrain(rawHeightData, window.terrainW, window.terrainH);
+            if (chunkingEnabled) {
+                rebuildAllChunkMeshes();
+            } else if(rawHeightData) buildTerrain(rawHeightData, window.terrainW, window.terrainH);
         });
 
         document.getElementById('bg-style').addEventListener('change', (e) => {
@@ -1083,7 +1170,33 @@
         alert(`Scale set to 1:1.\nReal Width: ${(realWidthMeters/1000).toFixed(2)}km\nHeight Range: ${Math.round(realHeightRangeMeters)}m`);
     }
 
+    function applyAutoHeightScale(exaggeration = 1.5) {
+        if (!demMetaData.hasMetadata) return;
+        const realWidthMeters = demMetaData.rawWidth * demMetaData.pixelScaleX;
+        const realHeightRangeMeters = demMetaData.max - demMetaData.min;
+        if (realWidthMeters <= 0 || realHeightRangeMeters <= 0) return;
+
+        const ratio = realHeightRangeMeters / realWidthMeters;
+        const newScale = currentWorldWidth * ratio * exaggeration;
+        HEIGHT_SCALE = Math.max(1, Math.round(newScale));
+
+        const slider = document.getElementById('height-scale');
+        if (slider) {
+            slider.max = Math.max(1000, Math.round(currentWorldWidth * ratio * 5));
+            slider.value = HEIGHT_SCALE;
+        }
+    }
+
     // --- CORE TERRAIN BUILDER WITH CHUNKING ---
+
+    function isValidElevation(val) {
+        if (isNaN(val) || !isFinite(val)) return false;
+        if (demMetaData.noDataValue !== null && Math.abs(val - demMetaData.noDataValue) < 1e-5) return false;
+        // Check common NoData flags and extreme outliers (e.g. >30km which shouldn't exist on Earth)
+        if (val === -32768 || val === -9999 || val === -99999 || Math.abs(val) > 1e10) return false;
+        if (val < -30000 || val > 30000) return false;
+        return true;
+    }
 
     function buildTerrain(heights, width, height) {
         while(terrainGroup.children.length > 0){ 
@@ -1095,6 +1208,7 @@
         window.terrainW = width;
         window.terrainH = height;
 
+        const oldWorldWidth = currentWorldWidth;
         if (currentAspect >= 1) {
             currentWorldWidth = BASE_SIZE;
             currentWorldDepth = BASE_SIZE / currentAspect;
@@ -1277,6 +1391,30 @@
 
     function exportGLB() {
         if(terrainGroup.children.length === 0) return;
+
+        let hiddenMeshes = [];
+        if (chunkingEnabled) {
+            if (confirm("You are currently in Chunked Mode.\n\nDo you want to isolate and export ONLY the chunk you are currently standing in?\n(Click OK for Current Chunk, or Cancel to export all loaded chunks)")) {
+                const { cx, cy } = getCameraChunkCoords();
+                const key = `${cx},${cy}`;
+                const currentChunk = loadedChunks.get(key);
+                if (currentChunk && currentChunk.meshes) {
+                    for (const [k, chunkData] of loadedChunks.entries()) {
+                        if (k !== key && chunkData.meshes) {
+                            chunkData.meshes.forEach(m => {
+                                if (m.visible) {
+                                    m.visible = false;
+                                    hiddenMeshes.push(m);
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    alert("Current chunk is not fully loaded. Exporting all loaded chunks instead.");
+                }
+            }
+        }
+
         const loader = document.getElementById('loading-indicator');
         loader.style.display = 'block';
         document.getElementById('loading-msg').innerText = "Generating 3D Model...";
@@ -1297,8 +1435,14 @@
                     link.click();
                     document.body.removeChild( link );
                     loader.style.display = 'none';
+                    hiddenMeshes.forEach(m => m.visible = true);
                 },
-                function ( error ) { console.error( error ); alert('Export failed.'); loader.style.display = 'none'; },
+                function ( error ) { 
+                    console.error( error ); 
+                    alert('Export failed.'); 
+                    loader.style.display = 'none'; 
+                    hiddenMeshes.forEach(m => m.visible = true);
+                },
                 { binary: true }
             );
         }, 100);
@@ -1480,6 +1624,10 @@
     // --- Physics & Util ---
 
     function getTerrainHeight(x, z) {
+        // Use chunked height lookup when spatial chunking is active
+        if (chunkingEnabled && chunkGrid) {
+            return getChunkedTerrainHeight(x, z);
+        }
         if (!processedHeightData) return 0;
         
         const halfW = currentWorldWidth / 2;
@@ -1488,7 +1636,7 @@
         let u = (x + halfW) / currentWorldWidth;
         let v = (z + halfD) / currentWorldDepth;
 
-        if (u < 0 || u >= 1 || v < 0 || v >= 1) return -1000;
+        if (u < 0 || u >= 1 || v < 0 || v >= 1) return null;
 
         const resX = window.terrainW;
         const resY = window.terrainH;
@@ -1631,6 +1779,16 @@
     // Include existing file/image logic...
     async function handleFileUpload(event) {
         const file = event.target.files[0]; if (!file) return;
+        
+        // Remove existing terrain immediately
+        while(terrainGroup.children.length > 0){ 
+            const mesh = terrainGroup.children[0];
+            mesh.geometry.dispose();
+            if(mesh.material) mesh.material.dispose();
+            terrainGroup.remove(mesh);
+        }
+        if (typeof clearAllChunks === 'function') clearAllChunks();
+        
         const loader = document.getElementById('loading-indicator'); loader.style.display = 'block';
         const name = file.name.toLowerCase(); document.getElementById('minimap-title').innerText = file.name;
 
@@ -1646,6 +1804,7 @@
                 demMetaData.rawWidth = rawWidth; demMetaData.rawHeight = rawHeight; demMetaData.hasMetadata = true;
                 if (modelPixelScale && modelPixelScale.length >= 1) demMetaData.pixelScaleX = modelPixelScale[0];
                 else demMetaData.pixelScaleX = 30; 
+                demMetaData.noDataValue = fileDirectory.GDAL_NODATA ? parseFloat(fileDirectory.GDAL_NODATA) : null;
                 await reloadGeoTiff(image);
             } else {
                 alert("Only GeoTIFF files (.tif, .tiff) are supported.");
@@ -1664,8 +1823,73 @@
         if (currentAspect >= 1) { readW = targetRes; readH = Math.round(targetRes / currentAspect); } 
         else { readH = targetRes; readW = Math.round(targetRes * currentAspect); }
 
-        // Check if file is very large or needs high-quality downsampling to prevent aliasing ("lines")
+        // --- Spatial chunking detection ---
+        // If the source file has significantly more pixels than the budget, enable chunking
+        const budgetPixels = readW * readH;
         const sourcePixels = sourceWidth * sourceHeight;
+        const chunkingRatio = sourcePixels / budgetPixels;
+
+        // Reset chunking state
+        clearAllChunks();
+        chunkingEnabled = false;
+        chunkGrid = null;
+
+        const isMassiveFile = sourcePixels > 50000000; // > 50M pixels (e.g. > 7000x7000)
+
+        if ((chunkingRatio > 2.5 && targetRes >= 2048) || isMassiveFile) {
+            // Let's base chunks on source pixels. 1 chunk = ~2000x2000 source pixels (like ringborgcrop).
+            const preferredChunkSize = 2000; 
+            const chunksX = Math.max(2, Math.ceil(sourceWidth / preferredChunkSize));
+            const chunksY = Math.max(2, Math.ceil(sourceHeight / preferredChunkSize));
+
+            const chunkPixelsX = Math.ceil(sourceWidth / chunksX);
+            const chunkPixelsY = Math.ceil(sourceHeight / chunksY);
+
+            chunkGrid = {
+                chunksX, chunksY,
+                chunkPixelsX, chunkPixelsY,
+                sourceW: sourceWidth,
+                sourceH: sourceHeight,
+                targetChunkW: readW,
+                targetChunkH: readH
+            };
+            chunkingEnabled = true;
+
+            msg.innerText = `Large DEM detected (${(sourcePixels/1e6).toFixed(1)}M px). Chunking into ${chunksX}×${chunksY} tiles...`;
+
+            // Set up world dimensions
+            // 1 chunk should be roughly half the size of ringborgcrop (1000 units)
+            const chunkWorldSize = 1000; 
+            currentWorldWidth = chunksX * chunkWorldSize;
+            currentWorldDepth = currentWorldWidth / currentAspect;
+
+            // First: sample min/max for normalization from the whole file
+            await sampleGlobalMinMax(image, msg);
+            
+            // Adjust to a visually pleasing realistic scale based on physical range
+            applyAutoHeightScale(1.5);
+
+            // Initialize an empty minimap grid, it will fill as chunks load
+            initEmptyMinimap();
+
+            // Load initial chunks around camera center asynchronously (fire and forget)
+            loader.style.display = 'none';
+            loadChunksAroundCamera(image);
+
+            // Show chunking notification
+            showChunkToast(
+                `Your DEM (${(sourcePixels/1e6).toFixed(1)}M pixels) is loaded as ${chunksX}×${chunksY} high-detail chunks. ` +
+                `Terrain loads progressively as you explore.`,
+                8000
+            );
+
+            document.getElementById('stat-display').innerText = 
+                `Chunked: ${chunksX}×${chunksY} | ${readW}×${readH}/chunk | Source: ${sourceWidth}×${sourceHeight}`;
+            return;
+        }
+
+        // --- Original non-chunked path ---
+        // Check if file is very large or needs high-quality downsampling to prevent aliasing ("lines")
         const isVeryLarge = sourcePixels > 100000000; // 100 million pixels
         const needsDownsample = sourceWidth > readW * 1.5 || sourceHeight > readH * 1.5;
         
@@ -1752,7 +1976,7 @@
                     const data = rasters[0];
                     for (let i = 0; i < data.length; i += sampleStep) {
                         const val = data[i];
-                        if (val > -10000 && val < 10000) {
+                        if (isValidElevation(val)) {
                             if (val < globalMin) globalMin = val;
                             if (val > globalMax) globalMax = val;
                         }
@@ -1814,7 +2038,7 @@
                             
                             const tileIdx = sy * w + sx;
                             let val = tileData[tileIdx];
-                            if (val < -10000 || val > 10000) val = globalMin;
+                            if (!isValidElevation(val)) val = globalMin;
                             const norm = (val - globalMin) / range;
                             
                             if (tx0 >= 0 && tx0 < targetWidth && ty0 >= 0 && ty0 < targetHeight) {
@@ -1873,8 +2097,579 @@
         msg.innerText = 'Building terrain...';
         rawHeightData = outputData;
         buildTerrain(outputData, targetWidth, targetHeight);
+        applyAutoHeightScale(1.5);
         loader.style.display = 'none';
     }
+
+    // =====================================================================
+    //  SPATIAL CHUNKING SYSTEM
+    // =====================================================================
+
+    function clearAllChunks() {
+        for (const [key, chunk] of loadedChunks) {
+            if (chunk.meshes) {
+                chunk.meshes.forEach(m => {
+                    m.geometry.dispose();
+                    if (m.material) m.material.dispose();
+                    terrainGroup.remove(m);
+                });
+            }
+        }
+        loadedChunks.clear();
+        chunkLoadQueue = [];
+        isChunkLoading = false;
+    }
+
+    function rebuildAllChunkMeshes() {
+        if (!chunkGrid) return;
+        
+        // Save current chunk data
+        const chunksData = [];
+        for (const [key, chunk] of loadedChunks) {
+            if (!chunk.loading && !chunk.failed && chunk.heightData) {
+                chunksData.push(chunk);
+            }
+        }
+        
+        // Remove old meshes
+        for (const [key, chunk] of loadedChunks) {
+            if (chunk.meshes) {
+                chunk.meshes.forEach(m => {
+                    m.geometry.dispose();
+                    if (m.material) m.material.dispose();
+                    terrainGroup.remove(m);
+                });
+            }
+            chunk.meshes = [];
+        }
+        
+        // Rebuild meshes instantly from cached heightData
+        for (const chunk of chunksData) {
+            chunk.meshes = buildChunkMesh(chunk.heightData, chunk.readW, chunk.readH, chunk.cx, chunk.cy);
+        }
+    }
+
+    async function sampleGlobalMinMax(image, msg) {
+        const sourceWidth = image.getWidth();
+        const sourceHeight = image.getHeight();
+        let globalMin = Infinity, globalMax = -Infinity;
+
+        msg.innerText = 'Sampling elevation range...';
+
+        // Sample a few tiles across the source to get min/max
+        const sampleTileSize = 512;
+        const stepsX = Math.max(1, Math.ceil(sourceWidth / sampleTileSize));
+        const stepsY = Math.max(1, Math.ceil(sourceHeight / sampleTileSize));
+        const totalTiles = stepsX * stepsY;
+        const sampleGap = Math.max(1, Math.floor(Math.sqrt(totalTiles / 100))); // Sample up to ~100 tiles for accurate min/max
+
+        if (!window.tiffPool) window.tiffPool = new Pool();
+
+        for (let ty = 0; ty < stepsY; ty += Math.max(1, sampleGap)) {
+            for (let tx = 0; tx < stepsX; tx += Math.max(1, sampleGap)) {
+                const x = tx * sampleTileSize;
+                const y = ty * sampleTileSize;
+                const w = Math.min(sampleTileSize, sourceWidth - x);
+                const h = Math.min(sampleTileSize, sourceHeight - y);
+                try {
+                    const rasters = await image.readRasters({
+                        window: [x, y, x + w, y + h],
+                        samples: [0], pool: window.tiffPool
+                    });
+                    const data = rasters[0];
+                    for (let i = 0; i < data.length; i += 10) {
+                        const val = data[i];
+                        if (isValidElevation(val)) {
+                            if (val < globalMin) globalMin = val;
+                            if (val > globalMax) globalMax = val;
+                        }
+                    }
+                } catch (e) { /* skip failed sample tiles */ }
+            }
+            await new Promise(r => setTimeout(r, 0));
+        }
+
+        if (globalMin === Infinity) { globalMin = 0; globalMax = 1; }
+        demMetaData.min = globalMin;
+        demMetaData.max = globalMax;
+    }
+
+    function initEmptyMinimap() {
+        const canvas = document.createElement('canvas');
+        const previewMax = 256;
+        let pw, ph;
+        if (currentAspect >= 1) { pw = previewMax; ph = Math.round(previewMax / currentAspect); }
+        else { ph = previewMax; pw = Math.round(previewMax * currentAspect); }
+        
+        canvas.width = pw;
+        canvas.height = ph;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#111'; // dark background
+        ctx.fillRect(0, 0, pw, ph);
+        
+        // draw grid
+        ctx.strokeStyle = '#333';
+        if (chunkGrid) {
+            const { chunksX, chunksY } = chunkGrid;
+            const w = pw / chunksX;
+            const h = ph / chunksY;
+            for(let x=0; x<=chunksX; x++) { ctx.beginPath(); ctx.moveTo(x*w, 0); ctx.lineTo(x*w, ph); ctx.stroke(); }
+            for(let y=0; y<=chunksY; y++) { ctx.beginPath(); ctx.moveTo(0, y*h); ctx.lineTo(pw, y*h); ctx.stroke(); }
+        }
+        
+        document.getElementById('minimap-img').src = canvas.toDataURL();
+    }
+
+    function updateMinimapWithChunk(cx, cy, heightData, readW, readH) {
+        const img = document.getElementById('minimap-img');
+        if (!img || !img.src || !chunkGrid) return;
+        
+        const canvas = document.createElement('canvas');
+        const previewMax = 256;
+        let pw, ph;
+        if (currentAspect >= 1) { pw = previewMax; ph = Math.round(previewMax / currentAspect); }
+        else { ph = previewMax; pw = Math.round(previewMax * currentAspect); }
+        
+        canvas.width = pw;
+        canvas.height = ph;
+        const ctx = canvas.getContext('2d');
+        
+        const htmlImage = new Image();
+        htmlImage.onload = () => {
+            ctx.drawImage(htmlImage, 0, 0);
+            
+            const { chunksX, chunksY } = chunkGrid;
+            const chunkW = pw / chunksX;
+            const chunkH = ph / chunksY;
+            const px = cx * chunkW;
+            const py = cy * chunkH;
+            
+            const chunkCanvas = document.createElement('canvas');
+            chunkCanvas.width = readW;
+            chunkCanvas.height = readH;
+            const cCtx = chunkCanvas.getContext('2d');
+            const imgData = cCtx.createImageData(readW, readH);
+            for (let i = 0; i < heightData.length; i++) {
+                const norm = heightData[i] * 255;
+                const idx = i * 4;
+                imgData.data[idx] = norm;
+                imgData.data[idx+1] = norm;
+                imgData.data[idx+2] = norm;
+                imgData.data[idx+3] = 255;
+            }
+            cCtx.putImageData(imgData, 0, 0);
+            
+            ctx.drawImage(chunkCanvas, px, py, Math.ceil(chunkW), Math.ceil(chunkH));
+            img.src = canvas.toDataURL();
+        };
+        htmlImage.src = img.src;
+    }
+
+    function getChunkWorldBounds(cx, cy) {
+        // Returns { x, z, w, d } in world coordinates perfectly matching its true source pixel footprint
+        const { sourceW, sourceH, chunkPixelsX, chunkPixelsY } = chunkGrid;
+        
+        const srcX = cx * chunkPixelsX;
+        const srcY = cy * chunkPixelsY;
+        const srcW = Math.min(chunkPixelsX, sourceW - srcX);
+        const srcH = Math.min(chunkPixelsY, sourceH - srcY);
+
+        const x = -currentWorldWidth / 2 + (srcX / sourceW) * currentWorldWidth;
+        const z = -currentWorldDepth / 2 + (srcY / sourceH) * currentWorldDepth;
+        const w = (srcW / sourceW) * currentWorldWidth;
+        const d = (srcH / sourceH) * currentWorldDepth;
+
+        return { x, z, w, d };
+    }
+
+    function getCameraChunkCoords() {
+        if (!chunkGrid) return { cx: 0, cy: 0 };
+        const pos = controls.getObject().position;
+        const u = (pos.x + currentWorldWidth / 2) / currentWorldWidth;
+        const v = (pos.z + currentWorldDepth / 2) / currentWorldDepth;
+        const cx = Math.floor(u * chunkGrid.chunksX);
+        const cy = Math.floor(v * chunkGrid.chunksY);
+        return {
+            cx: Math.max(0, Math.min(chunkGrid.chunksX - 1, cx)),
+            cy: Math.max(0, Math.min(chunkGrid.chunksY - 1, cy))
+        };
+    }
+
+    async function loadSingleChunk(image, cx, cy) {
+        if (!chunkGrid) return;
+        const key = `${cx},${cy}`;
+        if (loadedChunks.has(key)) return;
+
+        const { chunksX, chunksY, chunkPixelsX, chunkPixelsY, sourceW, sourceH } = chunkGrid;
+        if (cx < 0 || cx >= chunksX || cy < 0 || cy >= chunksY) return;
+
+        // Mark as loading immediately to prevent duplicate loads
+        loadedChunks.set(key, { meshes: [], loading: true });
+
+        const srcX = cx * chunkPixelsX;
+        const srcY = cy * chunkPixelsY;
+        // Overlap by 1 source pixel to seamlessly connect chunks without gaps
+        const srcW = Math.min(chunkPixelsX + 1, sourceW - srcX);
+        const srcH = Math.min(chunkPixelsY + 1, sourceH - srcY);
+
+        // Determine the read resolution for this chunk
+        let readW, readH;
+        const targetRes = CHUNK_RES;
+        const chunkAspect = srcW / srcH;
+        if (chunkAspect >= 1) {
+            readW = Math.min(targetRes, srcW);
+            readH = Math.round(readW / chunkAspect);
+        } else {
+            readH = Math.min(targetRes, srcH);
+            readW = Math.round(readH * chunkAspect);
+        }
+        readW = Math.max(2, readW);
+        readH = Math.max(2, readH);
+
+        if (!window.tiffPool) window.tiffPool = new Pool();
+
+        try {
+            const rasters = await image.readRasters({
+                window: [srcX, srcY, srcX + srcW, srcY + srcH],
+                samples: [0],
+                width: readW,
+                height: readH,
+                resampleMethod: 'bilinear',
+                interleave: false,
+                pool: window.tiffPool
+            });
+
+            if (!rasters || !rasters[0]) {
+                loadedChunks.set(key, { loading: false, failed: true });
+                return;
+            }
+
+            const data = rasters[0];
+            const range = demMetaData.max - demMetaData.min || 1;
+            const heightData = new Float32Array(readW * readH);
+            for (let i = 0; i < data.length; i++) {
+                let val = data[i];
+                if (!isValidElevation(val)) val = demMetaData.min;
+                heightData[i] = (val - demMetaData.min) / range;
+            }
+
+            // Build mesh for this chunk
+            const meshes = buildChunkMesh(heightData, readW, readH, cx, cy);
+
+            loadedChunks.set(key, {
+                meshes,
+                heightData,
+                loading: false,
+                readW, readH,
+                cx, cy
+            });
+
+            updateMinimapWithChunk(cx, cy, heightData, readW, readH);
+
+            // Update stat display
+            const total = chunkGrid.chunksX * chunkGrid.chunksY;
+            const loaded = [...loadedChunks.values()].filter(c => !c.loading && !c.failed).length;
+            document.getElementById('stat-display').innerText = 
+                `Chunked: ${chunkGrid.chunksX}×${chunkGrid.chunksY} | Loaded: ${loaded}/${total} | ${readW}×${readH}/chunk`;
+
+        } catch (e) {
+            console.warn(`Chunk [${cx},${cy}] load failed:`, e.message);
+            loadedChunks.set(key, { loading: false, failed: true });
+        }
+    }
+
+    function buildChunkMesh(heights, width, height, cx, cy) {
+        const { chunksX, chunksY } = chunkGrid;
+        const bounds = getChunkWorldBounds(cx, cy);
+
+        const isSmooth = document.getElementById('btn-smooth').checked;
+        const processedH = isSmooth ? smoothHeights(heights, width, height) : heights;
+
+        const style = document.getElementById('texture-style').value;
+        const material = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: (style === 'clay') ? 0.6 : 0.8,
+            flatShading: !isSmooth
+        });
+
+        const maxChunkVerts = 255;
+        const segX = width - 1;
+        const segY = height - 1;
+        const gChunksX = Math.ceil(segX / maxChunkVerts);
+        const gChunksY = Math.ceil(segY / maxChunkVerts);
+
+        const meshes = [];
+
+        for (let gy = 0; gy < gChunksY; gy++) {
+            for (let gx = 0; gx < gChunksX; gx++) {
+                const startX = gx * maxChunkVerts;
+                const startY = gy * maxChunkVerts;
+                const currentSegX = Math.min(maxChunkVerts, segX - startX);
+                const currentSegY = Math.min(maxChunkVerts, segY - startY);
+
+                // Extend the physical geometry slightly to overlap neighbors and hide gaps
+                const cellW = segX > 0 ? bounds.w / segX : 0;
+                const cellD = segY > 0 ? bounds.d / segY : 0;
+                const chunkWidth = (currentSegX / segX) * bounds.w + cellW;
+                const chunkDepth = (currentSegY / segY) * bounds.d + cellD;
+                
+                // We shift the offset to maintain the same start coordinate, but the mesh is wider/deeper
+                const xOffset = bounds.x + (startX / segX) * bounds.w + chunkWidth / 2;
+                const zOffset = bounds.z + (startY / segY) * bounds.d + chunkDepth / 2;
+
+                const geometry = new THREE.PlaneGeometry(chunkWidth, chunkDepth, currentSegX, currentSegY);
+                geometry.rotateX(-Math.PI / 2);
+                geometry.translate(xOffset, 0, zOffset);
+
+                const vertices = geometry.attributes.position.array;
+                const normals = new Float32Array(vertices.length);
+                const colors = [];
+                const color = new THREE.Color();
+
+                const dx = bounds.w / (width - 1);
+                const dz = bounds.d / (height - 1);
+
+                const getH = (x, y) => {
+                    const safeX = Math.max(0, Math.min(width - 1, x));
+                    const safeY = Math.max(0, Math.min(height - 1, y));
+                    return processedH[safeY * width + safeX] * HEIGHT_SCALE;
+                };
+
+                for (let iy = 0; iy <= currentSegY; iy++) {
+                    for (let ix = 0; ix <= currentSegX; ix++) {
+                        const globalX = startX + ix;
+                        const globalY = startY + iy;
+                        const h = getH(globalX, globalY);
+
+                        const localIdx = iy * (currentSegX + 1) + ix;
+                        
+                        // Skirt logic: pull down the very edge vertices of the chunk bounds
+                        const { chunksX, chunksY } = chunkGrid;
+                        let isSkirt = false;
+                        if ((globalX === 0 && cx > 0) || (globalX === width - 1 && cx < chunksX - 1) ||
+                            (globalY === 0 && cy > 0) || (globalY === height - 1 && cy < chunksY - 1)) {
+                            isSkirt = true;
+                        }
+                        
+                        vertices[localIdx * 3 + 1] = isSkirt ? h - (HEIGHT_SCALE * 0.05) : h;
+
+                        const hL = globalX > 0 ? getH(globalX - 1, globalY) : h;
+                        const hR = globalX < width - 1 ? getH(globalX + 1, globalY) : h;
+                        const hU = globalY > 0 ? getH(globalX, globalY - 1) : h;
+                        const hD = globalY < height - 1 ? getH(globalX, globalY + 1) : h;
+
+                        const dHdx = (globalX > 0 && globalX < width - 1) ? (hR - hL) / (2 * dx) : 
+                                     globalX === 0 ? (hR - h) / dx : (h - hL) / dx;
+                        const dHdz = (globalY > 0 && globalY < height - 1) ? (hD - hU) / (2 * dz) : 
+                                     globalY === 0 ? (hD - h) / dz : (h - hU) / dz;
+
+                        const len = Math.sqrt(dHdx * dHdx + 1 + dHdz * dHdz);
+                        normals[localIdx * 3]     = -dHdx / len;
+                        normals[localIdx * 3 + 1] = 1 / len;
+                        normals[localIdx * 3 + 2] = -dHdz / len;
+
+                        const dataIdx = Math.min(globalY, height - 1) * width + Math.min(globalX, width - 1);
+                        const normH = processedH[dataIdx];
+
+                        if (style === 'grayscale') {
+                            color.setScalar(normH);
+                        } else if (style === 'heatmap') {
+                            let colorNorm = normH;
+                            if (colorNorm < 0) colorNorm = 0;
+                            if (colorNorm > 1) colorNorm = 1;
+                            
+                            if (colorNorm < 0.2) color.setHex(0x0000ff).lerp(new THREE.Color(0x00ffff), colorNorm / 0.2);
+                            else if (colorNorm < 0.4) color.setHex(0x00ffff).lerp(new THREE.Color(0x00ff00), (colorNorm - 0.2) / 0.2);
+                            else if (colorNorm < 0.6) color.setHex(0x00ff00).lerp(new THREE.Color(0xffff00), (colorNorm - 0.4) / 0.2);
+                            else if (colorNorm < 0.8) color.setHex(0xffff00).lerp(new THREE.Color(0xff0000), (colorNorm - 0.6) / 0.2);
+                            else color.setHex(0xff0000).lerp(new THREE.Color(0xff00ff), (colorNorm - 0.8) / 0.2);
+                        } else {
+                            color.setHex(0xaaaaaa);
+                        }
+                        colors.push(color.r, color.g, color.b);
+                    }
+                }
+
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                mesh.frustumCulled = true;
+                mesh.userData.chunkKey = `${cx},${cy}`;
+
+                terrainGroup.add(mesh);
+                meshes.push(mesh);
+            }
+        }
+
+        return meshes;
+    }
+
+    async function loadChunksAroundCamera(image) {
+        if (!chunkGrid || isChunkLoading) return;
+        isChunkLoading = true;
+
+        const { cx, cy } = getCameraChunkCoords();
+        const { chunksX, chunksY } = chunkGrid;
+        const loadRadius = Math.ceil(CHUNK_LOAD_RADIUS);
+        const unloadRadius = Math.ceil(CHUNK_UNLOAD_RADIUS);
+
+        // 1. Unload distant chunks
+        for (const [key, chunkData] of loadedChunks.entries()) {
+            const parts = key.split(',');
+            const curCx = parseInt(parts[0]);
+            const curCy = parseInt(parts[1]);
+            const dist = Math.sqrt(Math.pow(curCx - cx, 2) + Math.pow(curCy - cy, 2));
+
+            if (dist > unloadRadius) {
+                if (chunkData.meshes) {
+                    chunkData.meshes.forEach(m => {
+                        m.geometry.dispose();
+                        if (m.material) m.material.dispose();
+                        terrainGroup.remove(m);
+                    });
+                }
+                loadedChunks.delete(key);
+            }
+        }
+
+        // 2. Build list of chunks to load sorted by distance from camera chunk
+        const toLoad = [];
+        for (let dy = -loadRadius; dy <= loadRadius; dy++) {
+            for (let dx = -loadRadius; dx <= loadRadius; dx++) {
+                const ncx = cx + dx;
+                const ncy = cy + dy;
+                if (ncx < 0 || ncx >= chunksX || ncy < 0 || ncy >= chunksY) continue;
+                const key = `${ncx},${ncy}`;
+                if (loadedChunks.has(key)) continue;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist <= CHUNK_LOAD_RADIUS + 0.5) {
+                    toLoad.push({ cx: ncx, cy: ncy, dist });
+                }
+            }
+        }
+
+        toLoad.sort((a, b) => a.dist - b.dist);
+
+        if (toLoad.length > 0) {
+            const total = toLoad.length;
+            const progressFill = document.getElementById('chunk-progress-fill');
+            
+            for (let i = 0; i < toLoad.length; i++) {
+                await loadSingleChunk(image, toLoad[i].cx, toLoad[i].cy);
+                if (progressFill) {
+                    progressFill.style.width = `${Math.round(((i + 1) / total) * 100)}%`;
+                }
+                
+                // Important: Update camera position AS SOON AS the first (center) chunk is loaded
+                // so the user doesn't fall through the floor while waiting for everything else
+                if (i === 0 && velocity.length() === 0) {
+                    controls.getObject().position.set(0, HEIGHT_SCALE + 50, 0);
+                }
+
+                // Yield to allow rendering and walking between each chunk load
+                await new Promise(r => setTimeout(r, 50));
+            }
+        }
+
+        if (velocity.length() === 0) {
+            controls.getObject().position.set(0, HEIGHT_SCALE + 50, 0);
+        }
+
+        isChunkLoading = false;
+    }
+
+    function checkAndLoadNearbyChunks() {
+        if (!chunkingEnabled || !chunkGrid || !activeGeoTiffImage) return;
+        if (isCinemaPreview || isReelRendering) return; // Lock loaded chunks during video format/preview
+        const now = performance.now();
+        if (now - lastChunkCheckTime < CHUNK_CHECK_INTERVAL) return;
+        lastChunkCheckTime = now;
+
+        const { cx, cy } = getCameraChunkCoords();
+        const { chunksX, chunksY } = chunkGrid;
+        const radius = Math.ceil(CHUNK_LOAD_RADIUS);
+
+        let needsLoad = false;
+        for (let dy = -radius; dy <= radius && !needsLoad; dy++) {
+            for (let dx = -radius; dx <= radius && !needsLoad; dx++) {
+                const ncx = cx + dx;
+                const ncy = cy + dy;
+                if (ncx < 0 || ncx >= chunksX || ncy < 0 || ncy >= chunksY) continue;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist <= CHUNK_LOAD_RADIUS + 0.5 && !loadedChunks.has(`${ncx},${ncy}`)) {
+                    needsLoad = true;
+                }
+            }
+        }
+
+        if (needsLoad && !isChunkLoading) {
+            showChunkToast('Loading nearby terrain chunks...', 3000);
+            loadChunksAroundCamera(activeGeoTiffImage);
+        }
+    }
+
+    // Get terrain height for chunked mode
+    function getChunkedTerrainHeight(worldX, worldZ) {
+        if (!chunkGrid) return null;
+        const u = (worldX + currentWorldWidth / 2) / currentWorldWidth;
+        const v = (worldZ + currentWorldDepth / 2) / currentWorldDepth;
+        if (u < 0 || u >= 1 || v < 0 || v >= 1) return null;
+
+        const cx = Math.floor(u * chunkGrid.chunksX);
+        const cy = Math.floor(v * chunkGrid.chunksY);
+        const key = `${cx},${cy}`;
+        const chunk = loadedChunks.get(key);
+        if (!chunk || chunk.loading || !chunk.heightData) return null;
+
+        // Map world position to local chunk coordinates
+        const bounds = getChunkWorldBounds(cx, cy);
+        const localU = (worldX - bounds.x) / bounds.w;
+        const localV = (worldZ - bounds.z) / bounds.d;
+
+        const gridX = localU * (chunk.readW - 1);
+        const gridZ = localV * (chunk.readH - 1);
+
+        const col0 = Math.floor(gridX);
+        const row0 = Math.floor(gridZ);
+        const col1 = Math.min(col0 + 1, chunk.readW - 1);
+        const row1 = Math.min(row0 + 1, chunk.readH - 1);
+
+        const fracX = gridX - col0;
+        const fracZ = gridZ - row0;
+
+        const h00 = chunk.heightData[row0 * chunk.readW + Math.max(0, col0)];
+        const h10 = chunk.heightData[row0 * chunk.readW + col1];
+        const h01 = chunk.heightData[row1 * chunk.readW + Math.max(0, col0)];
+        const h11 = chunk.heightData[row1 * chunk.readW + col1];
+
+        const h0 = h00 * (1 - fracX) + h10 * fracX;
+        const h1 = h01 * (1 - fracX) + h11 * fracX;
+        return (h0 * (1 - fracZ) + h1 * fracZ) * HEIGHT_SCALE;
+    }
+
+    function showChunkToast(message, duration = 5000) {
+        const toast = document.getElementById('chunk-toast');
+        const msgEl = document.getElementById('chunk-toast-msg');
+        if (!toast || !msgEl) return;
+
+        if (chunkToastTimeout) clearTimeout(chunkToastTimeout);
+
+        msgEl.textContent = message;
+        toast.style.display = 'block';
+        // Trigger reflow for animation
+        void toast.offsetHeight;
+        toast.classList.add('visible');
+
+        chunkToastTimeout = setTimeout(() => {
+            toast.classList.remove('visible');
+            setTimeout(() => { toast.style.display = 'none'; }, 500);
+        }, duration);
+    }
+
+    // =====================================================================
     
     function generateGeoTiffPreviewFromArray(data, width, height) {
         const canvas = document.createElement('canvas');
@@ -1904,17 +2699,18 @@
         let min = Infinity, max = -Infinity;
         for (let i = 0; i < size; i++) {
             const val = data[i];
-            if (val > -10000 && val < 10000) { if (val < min) min = val; if (val > max) max = val; }
+            if (isValidElevation(val)) { if (val < min) min = val; if (val > max) max = val; }
         }
         if (min === Infinity) { min = 0; max = 1; } 
         const range = max - min || 1;
         demMetaData.min = min; demMetaData.max = max;
         for (let i = 0; i < size; i++) {
-            let val = data[i]; if (val < -10000 || val > 10000) val = min;
+            let val = data[i]; if (!isValidElevation(val)) val = min; 
             sampledHeights[i] = (val - min) / range;
         }
         rawHeightData = sampledHeights;
         buildTerrain(sampledHeights, width, height);
+        applyAutoHeightScale(1.5);
         loader.style.display = 'none';
     }
 
@@ -1934,11 +2730,11 @@
         let min = Infinity, max = -Infinity;
         for (let i = 0; i < data.length; i += 20) {
              const val = data[i];
-             if (val > -10000 && val < 10000) { if(val < min) min = val; if(val > max) max = val; }
+             if (isValidElevation(val)) { if(val < min) min = val; if(val > max) max = val; }
         }
         const range = max - min || 1;
         for (let i = 0; i < data.length; i++) {
-            let val = data[i]; if (val < -10000) val = min; 
+            let val = data[i]; if (!isValidElevation(val)) val = min; 
             const norm = ((val - min) / range) * 255; const index = i * 4;
             imgData.data[index] = norm; imgData.data[index+1] = norm; imgData.data[index+2] = norm; imgData.data[index+3] = 255;    
         }
@@ -2416,6 +3212,30 @@
     // --- 4K Offline Export ---
     async function startReelExport() {
         if (cinemaKeyframes.length < 2 || isPngExporting || !renderer || !camera || !scene) return;
+
+        let hiddenMeshes = [];
+        if (chunkingEnabled) {
+            if (confirm("You are currently in Chunked Mode.\n\nDo you want to isolate and record ONLY the chunk you are currently standing in?\n(Click OK for Current Chunk, or Cancel to record all loaded chunks)")) {
+                const { cx, cy } = getCameraChunkCoords();
+                const key = `${cx},${cy}`;
+                const currentChunk = loadedChunks.get(key);
+                if (currentChunk && currentChunk.meshes) {
+                    for (const [k, chunkData] of loadedChunks.entries()) {
+                        if (k !== key && chunkData.meshes) {
+                            chunkData.meshes.forEach(m => {
+                                if (m.visible) {
+                                    m.visible = false;
+                                    hiddenMeshes.push(m);
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    alert("Current chunk is not fully loaded. Recording all loaded chunks instead.");
+                }
+            }
+        }
+
         isReelRendering = true;
         if (controls.isLocked) controls.unlock();
 
@@ -2752,6 +3572,7 @@
                 alert(`Reel export failed: ${details}\n\nTry the \"H.264 Compatible (Phone Safe)\" preset for maximum phone playback support.`);
             }
         } finally {
+            hiddenMeshes.forEach(m => m.visible = true);
             exportRenderer.domElement.removeEventListener('webglcontextlost', onContextLost, false);
 
             try {
@@ -2831,6 +3652,9 @@
 
         if (isReelRendering) return;
 
+        // Progressive chunk loading
+        checkAndLoadNearbyChunks();
+
         // Cinema preview playback
         if (isCinemaPreview && _cinemaCurve) {
             const elapsed    = performance.now() - cinemaPreviewStart;
@@ -2905,7 +3729,10 @@
             const terrainH = getTerrainHeight(playerPos.x, playerPos.z);
             const eyeHeight = 15;
 
-            if (playerPos.y <= terrainH + eyeHeight) {
+            if (terrainH === null) {
+                // Ground has not loaded yet, or we are out of bounds. Prevent falling into the void.
+                velocity.y = Math.max(0, velocity.y);
+            } else if (playerPos.y <= terrainH + eyeHeight) {
                 // Ground collision resolution with an easing factor to reduce stutter
                 velocity.y = Math.max(0, velocity.y);
                 const targetY = terrainH + eyeHeight;
