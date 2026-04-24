@@ -572,14 +572,13 @@
     <div class="control-group">
         <label>1. Detail Level</label>
         <select id="resolution-selector">
-            <option value="512" selected>Low</option>
-            <option value="1024">Medium (1M Polys)</option>
+            <option value="1024" selected>Standard (1M Polys)</option>
             <option value="2048">High (4M Polys)</option>
             <option value="4096">Very High (16M Polys)</option>
             <option value="8192">Extreme (64M Polys)</option>
             <option value="16384">Extreme+ (256M Polys)</option>
         </select>
-        <div id="stat-display">Res: 512x512</div>
+        <div id="stat-display">Res: 1024x1024</div>
     </div>
 
     <div class="control-group">
@@ -796,7 +795,7 @@
     let currentWorldWidth = BASE_SIZE;
     let currentWorldDepth = BASE_SIZE;
     
-    let CHUNK_RES = 512; 
+    let CHUNK_RES = 1024; 
     let HEIGHT_SCALE = 300; 
     
     // --- Globals ---
@@ -834,6 +833,7 @@
     let loadedChunks = new Map();  // key "cx,cy" -> { meshes: [], heightData, offsetX, offsetY, w, h }
     let chunkLoadQueue = [];
     let isChunkLoading = false;
+    let chunkLoadSessionId = 0;
     let chunkToastTimeout = null;
     let lastChunkCheckTime = 0;
     const CHUNK_CHECK_INTERVAL = 500; // ms between proximity checks
@@ -961,9 +961,9 @@
             document.getElementById('touch-ui').style.display = 'block';
             document.getElementById('mobile-settings-btn').style.display = 'flex';
             document.getElementById('mobile-quick-bar').style.display = 'flex';
-            // Default to Low detail on mobile for performance
+            // Default to Standard detail on mobile for performance
             const resSel = document.getElementById('resolution-selector');
-            if (resSel && parseInt(resSel.value) > 512) { resSel.value = '512'; CHUNK_RES = 512; }
+            if (resSel && parseInt(resSel.value) > 1024) { resSel.value = '1024'; CHUNK_RES = 1024; }
         }
 
         const container = document.getElementById('canvas-container');
@@ -1081,9 +1081,13 @@
             HEIGHT_SCALE = parseInt(e.target.value);
             if (chunkingEnabled) {
                 if (rebuildTimeout) clearTimeout(rebuildTimeout);
-                rebuildTimeout = setTimeout(rebuildAllChunkMeshes, 150);
+                rebuildTimeout = setTimeout(() => {
+                    rebuildAllChunkMeshes();
+                    alignPlayerToTerrain(true);
+                }, 150);
             } else {
                 updateTerrainGeometry();
+                alignPlayerToTerrain(true);
             }
         });
 
@@ -1166,6 +1170,7 @@
         HEIGHT_SCALE = newScale;
         document.getElementById('height-scale').value = Math.round(newScale);
         updateTerrainGeometry();
+        alignPlayerToTerrain(true);
         
         alert(`Scale set to 1:1.\nReal Width: ${(realWidthMeters/1000).toFixed(2)}km\nHeight Range: ${Math.round(realHeightRangeMeters)}m`);
     }
@@ -1185,6 +1190,8 @@
             slider.max = Math.max(1000, Math.round(currentWorldWidth * ratio * 5));
             slider.value = HEIGHT_SCALE;
         }
+
+        alignPlayerToTerrain(true);
     }
 
     // --- CORE TERRAIN BUILDER WITH CHUNKING ---
@@ -1636,7 +1643,9 @@
         let u = (x + halfW) / currentWorldWidth;
         let v = (z + halfD) / currentWorldDepth;
 
-        if (u < 0 || u >= 1 || v < 0 || v >= 1) return null;
+        if (u < 0 || u > 1 || v < 0 || v > 1) return null;
+        u = Math.max(0, Math.min(1, u));
+        v = Math.max(0, Math.min(1, v));
 
         const resX = window.terrainW;
         const resY = window.terrainH;
@@ -1644,25 +1653,57 @@
         const gridX = u * (resX - 1);
         const gridZ = v * (resY - 1);
 
-        const col0 = Math.floor(gridX);
-        const row0 = Math.floor(gridZ);
+        const col0 = Math.max(0, Math.min(resX - 1, Math.floor(gridX)));
+        const row0 = Math.max(0, Math.min(resY - 1, Math.floor(gridZ)));
         const col1 = Math.min(col0 + 1, resX - 1);
         const row1 = Math.min(row0 + 1, resY - 1);
 
-        const fracX = gridX - col0;
-        const fracZ = gridZ - row0;
+        const fracX = Math.max(0, Math.min(1, gridX - Math.floor(gridX)));
+        const fracZ = Math.max(0, Math.min(1, gridZ - Math.floor(gridZ)));
 
         const h00 = processedHeightData[row0 * resX + col0];
         const h10 = processedHeightData[row0 * resX + col1];
         const h01 = processedHeightData[row1 * resX + col0];
         const h11 = processedHeightData[row1 * resX + col1];
 
-        const h0 = h00 * (1 - fracX) + h10 * fracX; 
-        const h1 = h01 * (1 - fracX) + h11 * fracX; 
+        let height;
+        if (fracX + fracZ <= 1.0) {
+            height = h00 + fracX * (h10 - h00) + fracZ * (h01 - h00);
+        } else {
+            height = h11 + (1.0 - fracX) * (h01 - h11) + (1.0 - fracZ) * (h10 - h11);
+        }
         
-        const height = h0 * (1 - fracZ) + h1 * fracZ;
+        const worldHeight = height * HEIGHT_SCALE;
+        return Number.isFinite(worldHeight) ? worldHeight : null;
+    }
 
-        return height * HEIGHT_SCALE;
+    function getCollisionFloorHeight(x, z) {
+        const samples = [
+            getTerrainHeight(x, z),
+            getTerrainHeight(x + 1.0, z),
+            getTerrainHeight(x - 1.0, z),
+            getTerrainHeight(x, z + 1.0),
+            getTerrainHeight(x, z - 1.0)
+        ].filter((h) => Number.isFinite(h));
+
+        if (samples.length === 0) return null;
+        return Math.max(...samples);
+    }
+
+    function alignPlayerToTerrain(force = false) {
+        if (!controls || flightMode) return;
+
+        const playerPos = controls.getObject().position;
+        const terrainH = getCollisionFloorHeight(playerPos.x, playerPos.z);
+        if (terrainH === null) return;
+
+        const eyeHeight = 15;
+        const targetY = terrainH + eyeHeight;
+        if (force || playerPos.y < targetY) {
+            playerPos.y = targetY;
+            velocity.y = Math.max(0, velocity.y);
+            canJump = true;
+        }
     }
 
     function smoothHeights(heights, width, height) {
@@ -1830,7 +1871,14 @@
         const chunkingRatio = sourcePixels / budgetPixels;
 
         // Reset chunking state
+        chunkLoadSessionId++;
         clearAllChunks();
+        while(terrainGroup.children.length > 0){ 
+            const mesh = terrainGroup.children[0];
+            mesh.geometry.dispose();
+            if(mesh.material) mesh.material.dispose();
+            terrainGroup.remove(mesh);
+        }
         chunkingEnabled = false;
         chunkGrid = null;
 
@@ -1858,10 +1906,13 @@
             msg.innerText = `Large DEM detected (${(sourcePixels/1e6).toFixed(1)}M px). Chunking into ${chunksX}×${chunksY} tiles...`;
 
             // Set up world dimensions
-            // 1 chunk should be roughly half the size of ringborgcrop (1000 units)
-            const chunkWorldSize = 1000; 
-            currentWorldWidth = chunksX * chunkWorldSize;
-            currentWorldDepth = currentWorldWidth / currentAspect;
+            if (currentAspect >= 1) {
+                currentWorldWidth = BASE_SIZE;
+                currentWorldDepth = BASE_SIZE / currentAspect;
+            } else {
+                currentWorldDepth = BASE_SIZE;
+                currentWorldWidth = BASE_SIZE * currentAspect;
+            }
 
             // First: sample min/max for normalization from the whole file
             await sampleGlobalMinMax(image, msg);
@@ -2096,8 +2147,17 @@
         
         msg.innerText = 'Building terrain...';
         rawHeightData = outputData;
-        buildTerrain(outputData, targetWidth, targetHeight);
+
+        if (currentAspect >= 1) {
+            currentWorldWidth = BASE_SIZE;
+            currentWorldDepth = BASE_SIZE / currentAspect;
+        } else {
+            currentWorldDepth = BASE_SIZE;
+            currentWorldWidth = BASE_SIZE * currentAspect;
+        }
         applyAutoHeightScale(1.5);
+
+        buildTerrain(outputData, targetWidth, targetHeight);
         loader.style.display = 'none';
     }
 
@@ -2145,8 +2205,12 @@
         
         // Rebuild meshes instantly from cached heightData
         for (const chunk of chunksData) {
-            chunk.meshes = buildChunkMesh(chunk.heightData, chunk.readW, chunk.readH, chunk.cx, chunk.cy);
+            const result = buildChunkMesh(chunk.heightData, chunk.readW, chunk.readH, chunk.cx, chunk.cy);
+            chunk.meshes = result.meshes;
+            chunk.processedH = result.processedH;
         }
+
+        alignPlayerToTerrain(true);
     }
 
     async function sampleGlobalMinMax(image, msg) {
@@ -2354,11 +2418,12 @@
             }
 
             // Build mesh for this chunk
-            const meshes = buildChunkMesh(heightData, readW, readH, cx, cy);
+            const { meshes, processedH } = buildChunkMesh(heightData, readW, readH, cx, cy);
 
             loadedChunks.set(key, {
                 meshes,
                 heightData,
+                processedH,
                 loading: false,
                 readW, readH,
                 cx, cy
@@ -2407,13 +2472,11 @@
                 const currentSegX = Math.min(maxChunkVerts, segX - startX);
                 const currentSegY = Math.min(maxChunkVerts, segY - startY);
 
-                // Extend the physical geometry slightly to overlap neighbors and hide gaps
-                const cellW = segX > 0 ? bounds.w / segX : 0;
-                const cellD = segY > 0 ? bounds.d / segY : 0;
-                const chunkWidth = (currentSegX / segX) * bounds.w + cellW;
-                const chunkDepth = (currentSegY / segY) * bounds.d + cellD;
+                // Calculate correct physical geometry bounds without artificial stretching
+                const chunkWidth = (currentSegX / segX) * bounds.w;
+                const chunkDepth = (currentSegY / segY) * bounds.d;
                 
-                // We shift the offset to maintain the same start coordinate, but the mesh is wider/deeper
+                // We shift the offset to maintain the same start coordinate
                 const xOffset = bounds.x + (startX / segX) * bounds.w + chunkWidth / 2;
                 const zOffset = bounds.z + (startY / segY) * bounds.d + chunkDepth / 2;
 
@@ -2504,7 +2567,7 @@
             }
         }
 
-        return meshes;
+        return { meshes, processedH };
     }
 
     async function loadChunksAroundCamera(image) {
@@ -2556,26 +2619,21 @@
         if (toLoad.length > 0) {
             const total = toLoad.length;
             const progressFill = document.getElementById('chunk-progress-fill');
+            const currentSession = chunkLoadSessionId;
             
             for (let i = 0; i < toLoad.length; i++) {
+                if (chunkLoadSessionId !== currentSession) {
+                    isChunkLoading = false;
+                    return;
+                }
                 await loadSingleChunk(image, toLoad[i].cx, toLoad[i].cy);
                 if (progressFill) {
                     progressFill.style.width = `${Math.round(((i + 1) / total) * 100)}%`;
-                }
-                
-                // Important: Update camera position AS SOON AS the first (center) chunk is loaded
-                // so the user doesn't fall through the floor while waiting for everything else
-                if (i === 0 && velocity.length() === 0) {
-                    controls.getObject().position.set(0, HEIGHT_SCALE + 50, 0);
                 }
 
                 // Yield to allow rendering and walking between each chunk load
                 await new Promise(r => setTimeout(r, 50));
             }
-        }
-
-        if (velocity.length() === 0) {
-            controls.getObject().position.set(0, HEIGHT_SCALE + 50, 0);
         }
 
         isChunkLoading = false;
@@ -2616,13 +2674,18 @@
         if (!chunkGrid) return null;
         const u = (worldX + currentWorldWidth / 2) / currentWorldWidth;
         const v = (worldZ + currentWorldDepth / 2) / currentWorldDepth;
-        if (u < 0 || u >= 1 || v < 0 || v >= 1) return null;
+        if (u < 0 || u > 1 || v < 0 || v > 1) return null;
 
-        const cx = Math.floor(u * chunkGrid.chunksX);
-        const cy = Math.floor(v * chunkGrid.chunksY);
+        const cu = Math.max(0, Math.min(1, u));
+        const cv = Math.max(0, Math.min(1, v));
+
+        const cx = Math.min(chunkGrid.chunksX - 1, Math.floor(cu * chunkGrid.chunksX));
+        const cy = Math.min(chunkGrid.chunksY - 1, Math.floor(cv * chunkGrid.chunksY));
         const key = `${cx},${cy}`;
         const chunk = loadedChunks.get(key);
-        if (!chunk || chunk.loading || !chunk.heightData) return null;
+        if (!chunk || chunk.loading || !chunk.processedH) return null;
+
+        const hData = chunk.processedH;
 
         // Map world position to local chunk coordinates
         const bounds = getChunkWorldBounds(cx, cy);
@@ -2632,22 +2695,32 @@
         const gridX = localU * (chunk.readW - 1);
         const gridZ = localV * (chunk.readH - 1);
 
-        const col0 = Math.floor(gridX);
-        const row0 = Math.floor(gridZ);
+        const col0 = Math.max(0, Math.min(chunk.readW - 1, Math.floor(gridX)));
+        const row0 = Math.max(0, Math.min(chunk.readH - 1, Math.floor(gridZ)));
         const col1 = Math.min(col0 + 1, chunk.readW - 1);
         const row1 = Math.min(row0 + 1, chunk.readH - 1);
 
-        const fracX = gridX - col0;
-        const fracZ = gridZ - row0;
+        const fracX = Math.max(0, Math.min(1, gridX - Math.floor(gridX)));
+        const fracZ = Math.max(0, Math.min(1, gridZ - Math.floor(gridZ)));
 
-        const h00 = chunk.heightData[row0 * chunk.readW + Math.max(0, col0)];
-        const h10 = chunk.heightData[row0 * chunk.readW + col1];
-        const h01 = chunk.heightData[row1 * chunk.readW + Math.max(0, col0)];
-        const h11 = chunk.heightData[row1 * chunk.readW + col1];
+        const h00 = hData[row0 * chunk.readW + col0];
+        const h10 = hData[row0 * chunk.readW + col1];
+        const h01 = hData[row1 * chunk.readW + col0];
+        const h11 = hData[row1 * chunk.readW + col1];
 
-        const h0 = h00 * (1 - fracX) + h10 * fracX;
-        const h1 = h01 * (1 - fracX) + h11 * fracX;
-        return (h0 * (1 - fracZ) + h1 * fracZ) * HEIGHT_SCALE;
+        if (!Number.isFinite(h00) || !Number.isFinite(h10) || !Number.isFinite(h01) || !Number.isFinite(h11)) {
+            return null;
+        }
+
+        let height;
+        if (fracX + fracZ <= 1.0) {
+            height = h00 + fracX * (h10 - h00) + fracZ * (h01 - h00);
+        } else {
+            height = h11 + (1.0 - fracX) * (h01 - h11) + (1.0 - fracZ) * (h10 - h11);
+        }
+
+        const worldHeight = height * HEIGHT_SCALE;
+        return Number.isFinite(worldHeight) ? worldHeight : null;
     }
 
     function showChunkToast(message, duration = 5000) {
@@ -2709,8 +2782,18 @@
             sampledHeights[i] = (val - min) / range;
         }
         rawHeightData = sampledHeights;
-        buildTerrain(sampledHeights, width, height);
+
+        if (currentAspect >= 1) {
+            currentWorldWidth = BASE_SIZE;
+            currentWorldDepth = BASE_SIZE / currentAspect;
+        } else {
+            currentWorldDepth = BASE_SIZE;
+            currentWorldWidth = BASE_SIZE * currentAspect;
+        }
         applyAutoHeightScale(1.5);
+
+        buildTerrain(sampledHeights, width, height);
+        alignPlayerToTerrain(true);
         loader.style.display = 'none';
     }
 
@@ -3710,7 +3793,6 @@
             // Ground mode physics - original behavior
             velocity.x -= velocity.x * 10.0 * delta;
             velocity.z -= velocity.z * 10.0 * delta;
-            velocity.y -= 9.8 * 100.0 * delta; 
 
             let inputZ = Number(moveForward) - Number(moveBackward) - joyMoveY;
             let inputX = Number(moveRight) - Number(moveLeft) + joyMoveX;
@@ -3726,29 +3808,30 @@
             controls.moveForward(-velocity.z * delta);
 
             const playerPos = controls.getObject().position;
-            const terrainH = getTerrainHeight(playerPos.x, playerPos.z);
+            const prevY = playerPos.y;
+            const terrainH = getCollisionFloorHeight(playerPos.x, playerPos.z);
             const eyeHeight = 15;
 
             if (terrainH === null) {
-                // Ground has not loaded yet, or we are out of bounds. Prevent falling into the void.
-                velocity.y = Math.max(0, velocity.y);
-            } else if (playerPos.y <= terrainH + eyeHeight) {
-                // Ground collision resolution with an easing factor to reduce stutter
-                velocity.y = Math.max(0, velocity.y);
-                const targetY = terrainH + eyeHeight;
-                const diff = targetY - playerPos.y;
-                
-                // smoothly ease to target depending on frame delta, or snap if difference is large
-                if (Math.abs(diff) > 20) {
-                    playerPos.y = targetY;
+                // If terrain is temporarily unavailable, freeze vertical motion to avoid sink-through.
+                velocity.y = 0;
+                playerPos.y = prevY;
+                canJump = false;
+            } else {
+                velocity.y -= 9.8 * 100.0 * delta;
+                playerPos.y += velocity.y * delta;
+
+                if (playerPos.y <= terrainH + eyeHeight) {
+                // Hard floor clamp avoids sinking/tunneling after detail or scale rebuilds.
+                    playerPos.y = terrainH + eyeHeight;
+                    velocity.y = Math.max(0, velocity.y);
+                    canJump = true;
                 } else {
-                    playerPos.y += diff * (delta * 15.0); // smooth approach
+                    canJump = false;
                 }
-                
-                canJump = true;
             }
-            playerPos.y += velocity.y * delta;
-            if (playerPos.y < -100) { playerPos.set(0, HEIGHT_SCALE + 50, 0); velocity.set(0,0,0); }
+
+            if (playerPos.y < -50000) { playerPos.set(0, HEIGHT_SCALE + 50, 0); velocity.set(0,0,0); }
         }
 
         // Update Minimap and Elevation

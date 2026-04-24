@@ -65,12 +65,11 @@ A web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
 
 | Level | Resolution | Polygons | Best For |
 |-------|-----------|----------|----------|
-| Low | 128×128 | ~16K | Quick preview, mobile devices |
-| Medium | 256×256 | ~65K | Balanced performance |
-| High | 512×512 | ~260K | Detailed visualization |
-| Ultra | 1024×1024 | ~1M | High-end systems |
-| Hyper | 2048×2048 | ~4M | Workstation GPUs |
-| Extreme | 4096×4096 | ~16M | Maximum detail |
+| Standard | 1024×1024 | ~1M | Balanced performance, default |
+| High | 2048×2048 | ~4M | Detailed visualization |
+| Very High | 4096×4096 | ~16M | High-end systems |
+| Extreme | 8192×8192 | ~64M | Workstation GPUs |
+| Extreme+ | 16384×16384 | ~256M | Maximum detail |
 
 ## 🛠️ Technical Architecture
 
