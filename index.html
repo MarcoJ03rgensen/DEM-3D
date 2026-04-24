@@ -576,7 +576,7 @@
             <option value="2048">High (4M Polys)</option>
             <option value="4096">Very High (16M Polys)</option>
             <option value="8192">Extreme (64M Polys)</option>
-            <option value="16384">Extreme+ (256M Polys)</option>
+            <option value="11585">Extreme+ (128M Polys)</option>
         </select>
         <div id="stat-display">Res: 1024x1024</div>
     </div>
@@ -625,90 +625,95 @@
 
 <!-- ===== CINEMA MODE PANEL ===== -->
 <div id="cinema-panel">
-    <h2>🎬 4K Reel Studio <span id="cinema-format-badge" style="font-size:0.7rem;opacity:0.45;font-weight:normal;">9:16 Portrait</span></h2>
-
-    <div class="cp-section">
-        <div class="cp-row">
-            <span class="cp-label">Aspect Ratio</span>
-            <select id="cp-aspect">
-                <option value="9:16" selected>9:16 Portrait (Reel)</option>
-                <option value="16:9">16:9 Landscape (YouTube)</option>
-            </select>
-        </div>
-        <span class="cp-label">Watermark Text</span>
-        <input type="text" id="cp-watermark" placeholder="@yourhandle" style="width:100%">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 style="margin:0;">🎬 4K Reel Studio <span id="cinema-format-badge" style="font-size:0.7rem;opacity:0.45;font-weight:normal;">9:16 Portrait</span></h2>
+        <button id="btn-toggle-cinema" class="btn btn-outline" style="width:auto; margin:0; padding:4px 10px; font-size:0.75rem;">Hide</button>
     </div>
+    
+    <div id="cinema-panel-content">
+        <div class="cp-section">
+            <div class="cp-row">
+                <span class="cp-label">Aspect Ratio</span>
+                <select id="cp-aspect">
+                    <option value="9:16" selected>9:16 Portrait (Reel)</option>
+                    <option value="16:9">16:9 Landscape (YouTube)</option>
+                </select>
+            </div>
+            <span class="cp-label">Watermark Text</span>
+            <input type="text" id="cp-watermark" placeholder="@yourhandle" style="width:100%">
+        </div>
 
-    <div class="cp-section">
-        <div id="kf-total">
-            Total: <span id="kf-total-sec">0.0</span>s
-            <span id="kf-total-frames" style="font-size:0.68rem;opacity:0.55;display:block;margin-top:2px;">0 frames @ 30fps · 35 Mbps · 4K</span>
+        <div class="cp-section">
+            <div id="kf-total">
+                Total: <span id="kf-total-sec">0.0</span>s
+                <span id="kf-total-frames" style="font-size:0.68rem;opacity:0.55;display:block;margin-top:2px;">0 frames @ 30fps · 35 Mbps · 4K</span>
+            </div>
+            <div class="cp-row">
+                <span class="cp-label">Secs / Keyframe</span>
+                <input type="number" id="cp-duration" value="4" step="0.5" min="0.5" max="60">
+            </div>
+            <div class="cp-row">
+                <span class="cp-label">Global Easing</span>
+                <select id="cp-easing">
+                    <option value="linear">Linear</option>
+                    <option value="easeIn">Ease In</option>
+                    <option value="easeOut">Ease Out</option>
+                    <option value="easeInOut">Ease In-Out</option>
+                    <option value="smootherstep" selected>Smootherstep</option>
+                    <option value="cinematic">Cinematic</option>
+                </select>
+            </div>
+            <div class="cp-row">
+                <span class="cp-label">Loop Mode</span>
+                <select id="cp-loop">
+                    <option value="none">No Loop</option>
+                    <option value="loop">Loop</option>
+                    <option value="pingpong">Ping-Pong</option>
+                </select>
+            </div>
+            <div class="cp-row">
+                <span class="cp-label">Pace</span>
+                <input type="range" id="cp-pace" min="0.25" max="4" step="0.25" value="1">
+            </div>
+            <div class="cp-row">
+                <span class="cp-label">Motion Blur</span>
+                <select id="cp-motionblur">
+                    <option value="0" selected>Off</option>
+                    <option value="4">4 samples</option>
+                    <option value="8">8 samples</option>
+                    <option value="16">16 samples (slow)</option>
+                </select>
+            </div>
+            <div class="cp-row">
+                <span class="cp-label">Codec Preset</span>
+                <select id="cp-codec">
+                    <option value="h264-compatible" selected>H.264 Compatible (Phone Safe)</option>
+                    <option value="auto">Auto (HEVC -> H.264 fallback)</option>
+                    <option value="h265-master">H.265 Master (HEVC)</option>
+                </select>
+            </div>
         </div>
-        <div class="cp-row">
-            <span class="cp-label">Secs / Keyframe</span>
-            <input type="number" id="cp-duration" value="4" step="0.5" min="0.5" max="60">
-        </div>
-        <div class="cp-row">
-            <span class="cp-label">Global Easing</span>
-            <select id="cp-easing">
-                <option value="linear">Linear</option>
-                <option value="easeIn">Ease In</option>
-                <option value="easeOut">Ease Out</option>
-                <option value="easeInOut">Ease In-Out</option>
-                <option value="smootherstep" selected>Smootherstep</option>
-                <option value="cinematic">Cinematic</option>
-            </select>
-        </div>
-        <div class="cp-row">
-            <span class="cp-label">Loop Mode</span>
-            <select id="cp-loop">
-                <option value="none">No Loop</option>
-                <option value="loop">Loop</option>
-                <option value="pingpong">Ping-Pong</option>
-            </select>
-        </div>
-        <div class="cp-row">
-            <span class="cp-label">Pace</span>
-            <input type="range" id="cp-pace" min="0.25" max="4" step="0.25" value="1">
-        </div>
-        <div class="cp-row">
-            <span class="cp-label">Motion Blur</span>
-            <select id="cp-motionblur">
-                <option value="0" selected>Off</option>
-                <option value="4">4 samples</option>
-                <option value="8">8 samples</option>
-                <option value="16">16 samples (slow)</option>
-            </select>
-        </div>
-        <div class="cp-row">
-            <span class="cp-label">Codec Preset</span>
-            <select id="cp-codec">
-                <option value="h264-compatible" selected>H.264 Compatible (Phone Safe)</option>
-                <option value="auto">Auto (HEVC -> H.264 fallback)</option>
-                <option value="h265-master">H.265 Master (HEVC)</option>
-            </select>
-        </div>
-    </div>
 
-    <div class="cp-section">
-        <span class="cp-label" style="margin-bottom:6px;">Keyframes</span>
-        <div id="kf-list">
-            <div id="kf-empty-msg" style="opacity:0.5;text-align:center;padding:10px;font-size:0.78rem;">Navigate with FPS controls,<br>then add keyframes.</div>
+        <div class="cp-section">
+            <span class="cp-label" style="margin-bottom:6px;">Keyframes</span>
+            <div id="kf-list">
+                <div id="kf-empty-msg" style="opacity:0.5;text-align:center;padding:10px;font-size:0.78rem;">Navigate with FPS controls,<br>then add keyframes.</div>
+            </div>
+            <button id="btn-add-kf" class="btn" style="margin-bottom:5px;">+ Add Current View</button>
+            <div style="display:flex;gap:5px;">
+                <button id="btn-preview-kf" class="btn btn-outline" style="flex:1;" disabled>▶ Preview</button>
+                <button id="btn-clear-kf" class="btn btn-secondary" style="flex:1;" disabled>✕ Clear</button>
+            </div>
         </div>
-        <button id="btn-add-kf" class="btn" style="margin-bottom:5px;">+ Add Current View</button>
-        <div style="display:flex;gap:5px;">
-            <button id="btn-preview-kf" class="btn btn-outline" style="flex:1;" disabled>▶ Preview</button>
-            <button id="btn-clear-kf" class="btn btn-secondary" style="flex:1;" disabled>✕ Clear</button>
+
+        <div class="cp-section">
+            <button id="btn-render-reel" class="btn btn-instagram" disabled>🎬 Export 4K Reel (MP4)</button>
+            <div id="cp-export-specs" style="font-size:0.68rem;color:#888;margin-top:5px;text-align:center;">2160 × 3840 · 30 fps · 35 Mbps (H.264 Compatible)</div>
         </div>
-    </div>
 
-    <div class="cp-section">
-        <button id="btn-render-reel" class="btn btn-instagram" disabled>🎬 Export 4K Reel (MP4)</button>
-        <div id="cp-export-specs" style="font-size:0.68rem;color:#888;margin-top:5px;text-align:center;">2160 × 3840 · 30 fps · 35 Mbps (H.264 Compatible)</div>
-    </div>
-
-    <div style="display:flex;gap:5px;margin-top:2px;">
-        <button id="btn-exit-cinema" class="btn btn-secondary" style="width:100%">✕ Exit Cinema Mode</button>
+        <div style="display:flex;gap:5px;margin-top:2px;">
+            <button id="btn-exit-cinema" class="btn btn-secondary" style="width:100%">✕ Exit Cinema Mode</button>
+        </div>
     </div>
 </div>
 
@@ -837,8 +842,8 @@
     let chunkToastTimeout = null;
     let lastChunkCheckTime = 0;
     const CHUNK_CHECK_INTERVAL = 500; // ms between proximity checks
-    const CHUNK_LOAD_RADIUS = 1;    // Load chunks within this many chunk-widths of camera (e.g., 1 = 3x3 grid)
-    const CHUNK_UNLOAD_RADIUS = 2;  // Unload chunks outside this radius
+    const CHUNK_LOAD_RADIUS = 3;    // Load chunks within this many chunk-widths of camera (e.g., 3 = 7x7 grid)
+    const CHUNK_UNLOAD_RADIUS = 4;  // Unload chunks outside this radius
     let lastPlayerChunkX = -1, lastPlayerChunkY = -1;
 
     // --- Cinema / 4K Reel Export ---
@@ -1242,7 +1247,9 @@
         const material = new THREE.MeshStandardMaterial({ 
             vertexColors: true, 
             roughness: (style === 'clay') ? 0.6 : 0.8, 
-            flatShading: !isSmooth
+            flatShading: !isSmooth,
+            transparent: true,
+            alphaTest: 0.5
         });
 
         for (let y = 0; y < chunksY; y++) {
@@ -1307,29 +1314,33 @@
                         const dataIdx = Math.min(globalY, height - 1) * width + Math.min(globalX, width - 1);
                         const normH = processedHeightData[dataIdx];
 
-                        if (style === 'grayscale') {
-                            color.setScalar(normH);
-                        } else if (style === 'heatmap') {
-                            // Detailed heatmap: blue -> cyan -> green -> yellow -> red -> magenta
-                            if (normH < 0.2) {
-                                color.setHex(0x0000ff).lerp(new THREE.Color(0x00ffff), normH / 0.2);
-                            } else if (normH < 0.4) {
-                                color.setHex(0x00ffff).lerp(new THREE.Color(0x00ff00), (normH - 0.2) / 0.2);
-                            } else if (normH < 0.6) {
-                                color.setHex(0x00ff00).lerp(new THREE.Color(0xffff00), (normH - 0.4) / 0.2);
-                            } else if (normH < 0.8) {
-                                color.setHex(0xffff00).lerp(new THREE.Color(0xff0000), (normH - 0.6) / 0.2);
-                            } else {
-                                color.setHex(0xff0000).lerp(new THREE.Color(0xff00ff), (normH - 0.8) / 0.2);
+                        if (normH < 0) {
+                            colors.push(0, 0, 0, 0);
+                        } else {
+                            if (style === 'grayscale') {
+                                color.setScalar(normH);
+                            } else if (style === 'heatmap') {
+                                // Detailed heatmap: blue -> cyan -> green -> yellow -> red -> magenta
+                                if (normH < 0.2) {
+                                    color.setHex(0x0000ff).lerp(new THREE.Color(0x00ffff), normH / 0.2);
+                                } else if (normH < 0.4) {
+                                    color.setHex(0x00ffff).lerp(new THREE.Color(0x00ff00), (normH - 0.2) / 0.2);
+                                } else if (normH < 0.6) {
+                                    color.setHex(0x00ff00).lerp(new THREE.Color(0xffff00), (normH - 0.4) / 0.2);
+                                } else if (normH < 0.8) {
+                                    color.setHex(0xffff00).lerp(new THREE.Color(0xff0000), (normH - 0.6) / 0.2);
+                                } else {
+                                    color.setHex(0xff0000).lerp(new THREE.Color(0xff00ff), (normH - 0.8) / 0.2);
+                                }
+                            } else { 
+                                color.setHex(0xaaaaaa);
                             }
-                        } else { 
-                            color.setHex(0xaaaaaa);
+                            colors.push(color.r, color.g, color.b, 1);
                         }
-                        colors.push(color.r, color.g, color.b);
                     }
                 }
 
-                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
                 geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
                 
                 geometry.userData = { startX, startY, segX: currentSegX, segY: currentSegY };
@@ -1666,6 +1677,8 @@
         const h01 = processedHeightData[row1 * resX + col0];
         const h11 = processedHeightData[row1 * resX + col1];
 
+        if (h00 < 0 || h10 < 0 || h01 < 0 || h11 < 0) return null;
+
         let height;
         if (fracX + fracZ <= 1.0) {
             height = h00 + fracX * (h10 - h00) + fracZ * (h01 - h00);
@@ -1715,32 +1728,46 @@
         // Horizontal pass
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
+                if (heights[y * width + x] < 0) {
+                    temp[y * width + x] = -1;
+                    continue;
+                }
                 let sum = 0;
                 let count = 0;
                 for (let dx = -radius; dx <= radius; dx++) {
                     const nx = x + dx;
                     if (nx >= 0 && nx < width) {
-                        sum += heights[y * width + nx];
-                        count++;
+                        const h = heights[y * width + nx];
+                        if (h >= 0) {
+                            sum += h;
+                            count++;
+                        }
                     }
                 }
-                temp[y * width + x] = sum / count;
+                temp[y * width + x] = count > 0 ? sum / count : heights[y * width + x];
             }
         }
 
         // Vertical pass
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
+                if (temp[y * width + x] < 0) {
+                    newHeights[y * width + x] = -1;
+                    continue;
+                }
                 let sum = 0;
                 let count = 0;
                 for (let dy = -radius; dy <= radius; dy++) {
                     const ny = y + dy;
                     if (ny >= 0 && ny < height) {
-                        sum += temp[ny * width + x];
-                        count++;
+                        const h = temp[ny * width + x];
+                        if (h >= 0) {
+                            sum += h;
+                            count++;
+                        }
                     }
                 }
-                newHeights[y * width + x] = sum / count;
+                newHeights[y * width + x] = count > 0 ? sum / count : temp[y * width + x];
             }
         }
         return newHeights;
@@ -1996,6 +2023,7 @@
         
         // Create output arrays
         const outputData = new Float32Array(targetWidth * targetHeight);
+        outputData.fill(-1);
         const outputCount = new Float32Array(targetWidth * targetHeight);
         let globalMin = Infinity;
         let globalMax = -Infinity;
@@ -2089,24 +2117,25 @@
                             
                             const tileIdx = sy * w + sx;
                             let val = tileData[tileIdx];
-                            if (!isValidElevation(val)) val = globalMin;
-                            const norm = (val - globalMin) / range;
-                            
-                            if (tx0 >= 0 && tx0 < targetWidth && ty0 >= 0 && ty0 < targetHeight) {
-                                const idx = ty0 * targetWidth + tx0;
-                                outputData[idx] += norm * w00; outputCount[idx] += w00;
-                            }
-                            if (tx1 >= 0 && tx1 < targetWidth && ty0 >= 0 && ty0 < targetHeight) {
-                                const idx = ty0 * targetWidth + tx1;
-                                outputData[idx] += norm * w10; outputCount[idx] += w10;
-                            }
-                            if (tx0 >= 0 && tx0 < targetWidth && ty1 >= 0 && ty1 < targetHeight) {
-                                const idx = ty1 * targetWidth + tx0;
-                                outputData[idx] += norm * w01; outputCount[idx] += w01;
-                            }
-                            if (tx1 >= 0 && tx1 < targetWidth && ty1 >= 0 && ty1 < targetHeight) {
-                                const idx = ty1 * targetWidth + tx1;
-                                outputData[idx] += norm * w11; outputCount[idx] += w11;
+                            if (isValidElevation(val)) {
+                                const norm = (val - globalMin) / range;
+                                
+                                if (tx0 >= 0 && tx0 < targetWidth && ty0 >= 0 && ty0 < targetHeight) {
+                                    const idx = ty0 * targetWidth + tx0;
+                                    outputData[idx] += norm * w00; outputCount[idx] += w00;
+                                }
+                                if (tx1 >= 0 && tx1 < targetWidth && ty0 >= 0 && ty0 < targetHeight) {
+                                    const idx = ty0 * targetWidth + tx1;
+                                    outputData[idx] += norm * w10; outputCount[idx] += w10;
+                                }
+                                if (tx0 >= 0 && tx0 < targetWidth && ty1 >= 0 && ty1 < targetHeight) {
+                                    const idx = ty1 * targetWidth + tx0;
+                                    outputData[idx] += norm * w01; outputCount[idx] += w01;
+                                }
+                                if (tx1 >= 0 && tx1 < targetWidth && ty1 >= 0 && ty1 < targetHeight) {
+                                    const idx = ty1 * targetWidth + tx1;
+                                    outputData[idx] += norm * w11; outputCount[idx] += w11;
+                                }
                             }
                         }
                     }
@@ -2367,6 +2396,9 @@
         const { chunksX, chunksY, chunkPixelsX, chunkPixelsY, sourceW, sourceH } = chunkGrid;
         if (cx < 0 || cx >= chunksX || cy < 0 || cy >= chunksY) return;
 
+        // Capture session ID to detect if settings changed while loading
+        const currentSession = chunkLoadSessionId;
+
         // Mark as loading immediately to prevent duplicate loads
         loadedChunks.set(key, { meshes: [], loading: true });
 
@@ -2403,6 +2435,9 @@
                 pool: window.tiffPool
             });
 
+            // Abort if session changed (e.g. resolution changed, full reload triggered)
+            if (chunkLoadSessionId !== currentSession) return;
+
             if (!rasters || !rasters[0]) {
                 loadedChunks.set(key, { loading: false, failed: true });
                 return;
@@ -2413,8 +2448,11 @@
             const heightData = new Float32Array(readW * readH);
             for (let i = 0; i < data.length; i++) {
                 let val = data[i];
-                if (!isValidElevation(val)) val = demMetaData.min;
-                heightData[i] = (val - demMetaData.min) / range;
+                if (!isValidElevation(val)) {
+                    heightData[i] = -1;
+                } else {
+                    heightData[i] = (val - demMetaData.min) / range;
+                }
             }
 
             // Build mesh for this chunk
@@ -2454,7 +2492,9 @@
         const material = new THREE.MeshStandardMaterial({
             vertexColors: true,
             roughness: (style === 'clay') ? 0.6 : 0.8,
-            flatShading: !isSmooth
+            flatShading: !isSmooth,
+            transparent: true,
+            alphaTest: 0.5
         });
 
         const maxChunkVerts = 255;
@@ -2495,7 +2535,8 @@
                 const getH = (x, y) => {
                     const safeX = Math.max(0, Math.min(width - 1, x));
                     const safeY = Math.max(0, Math.min(height - 1, y));
-                    return processedH[safeY * width + safeX] * HEIGHT_SCALE;
+                    const val = processedH[safeY * width + safeX];
+                    return val >= 0 ? val * HEIGHT_SCALE : 0;
                 };
 
                 for (let iy = 0; iy <= currentSegY; iy++) {
@@ -2506,15 +2547,7 @@
 
                         const localIdx = iy * (currentSegX + 1) + ix;
                         
-                        // Skirt logic: pull down the very edge vertices of the chunk bounds
-                        const { chunksX, chunksY } = chunkGrid;
-                        let isSkirt = false;
-                        if ((globalX === 0 && cx > 0) || (globalX === width - 1 && cx < chunksX - 1) ||
-                            (globalY === 0 && cy > 0) || (globalY === height - 1 && cy < chunksY - 1)) {
-                            isSkirt = true;
-                        }
-                        
-                        vertices[localIdx * 3 + 1] = isSkirt ? h - (HEIGHT_SCALE * 0.05) : h;
+                        vertices[localIdx * 3 + 1] = h;
 
                         const hL = globalX > 0 ? getH(globalX - 1, globalY) : h;
                         const hR = globalX < width - 1 ? getH(globalX + 1, globalY) : h;
@@ -2534,26 +2567,29 @@
                         const dataIdx = Math.min(globalY, height - 1) * width + Math.min(globalX, width - 1);
                         const normH = processedH[dataIdx];
 
-                        if (style === 'grayscale') {
-                            color.setScalar(normH);
-                        } else if (style === 'heatmap') {
-                            let colorNorm = normH;
-                            if (colorNorm < 0) colorNorm = 0;
-                            if (colorNorm > 1) colorNorm = 1;
-                            
-                            if (colorNorm < 0.2) color.setHex(0x0000ff).lerp(new THREE.Color(0x00ffff), colorNorm / 0.2);
-                            else if (colorNorm < 0.4) color.setHex(0x00ffff).lerp(new THREE.Color(0x00ff00), (colorNorm - 0.2) / 0.2);
-                            else if (colorNorm < 0.6) color.setHex(0x00ff00).lerp(new THREE.Color(0xffff00), (colorNorm - 0.4) / 0.2);
-                            else if (colorNorm < 0.8) color.setHex(0xffff00).lerp(new THREE.Color(0xff0000), (colorNorm - 0.6) / 0.2);
-                            else color.setHex(0xff0000).lerp(new THREE.Color(0xff00ff), (colorNorm - 0.8) / 0.2);
+                        if (normH < 0) {
+                            colors.push(0, 0, 0, 0);
                         } else {
-                            color.setHex(0xaaaaaa);
+                            if (style === 'grayscale') {
+                                color.setScalar(normH);
+                            } else if (style === 'heatmap') {
+                                let colorNorm = normH;
+                                if (colorNorm > 1) colorNorm = 1;
+                                
+                                if (colorNorm < 0.2) color.setHex(0x0000ff).lerp(new THREE.Color(0x00ffff), colorNorm / 0.2);
+                                else if (colorNorm < 0.4) color.setHex(0x00ffff).lerp(new THREE.Color(0x00ff00), (colorNorm - 0.2) / 0.2);
+                                else if (colorNorm < 0.6) color.setHex(0x00ff00).lerp(new THREE.Color(0xffff00), (colorNorm - 0.4) / 0.2);
+                                else if (colorNorm < 0.8) color.setHex(0xffff00).lerp(new THREE.Color(0xff0000), (colorNorm - 0.6) / 0.2);
+                                else color.setHex(0xff0000).lerp(new THREE.Color(0xff00ff), (colorNorm - 0.8) / 0.2);
+                            } else {
+                                color.setHex(0xaaaaaa);
+                            }
+                            colors.push(color.r, color.g, color.b, 1);
                         }
-                        colors.push(color.r, color.g, color.b);
                     }
                 }
 
-                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
                 geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
 
                 const mesh = new THREE.Mesh(geometry, material);
@@ -2708,6 +2744,8 @@
         const h01 = hData[row1 * chunk.readW + col0];
         const h11 = hData[row1 * chunk.readW + col1];
 
+        if (h00 < 0 || h10 < 0 || h01 < 0 || h11 < 0) return null;
+
         if (!Number.isFinite(h00) || !Number.isFinite(h10) || !Number.isFinite(h01) || !Number.isFinite(h11)) {
             return null;
         }
@@ -2778,8 +2816,12 @@
         const range = max - min || 1;
         demMetaData.min = min; demMetaData.max = max;
         for (let i = 0; i < size; i++) {
-            let val = data[i]; if (!isValidElevation(val)) val = min; 
-            sampledHeights[i] = (val - min) / range;
+            let val = data[i];
+            if (!isValidElevation(val)) {
+                sampledHeights[i] = -1;
+            } else {
+                sampledHeights[i] = (val - min) / range;
+            }
         }
         rawHeightData = sampledHeights;
 
@@ -3693,6 +3735,16 @@
 
     // --- Wire up Cinema UI events ---
     function setupCinemaEvents() {
+        document.getElementById('btn-toggle-cinema').addEventListener('click', (e) => {
+            const content = document.getElementById('cinema-panel-content');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                e.target.textContent = 'Hide';
+            } else {
+                content.style.display = 'none';
+                e.target.textContent = 'Show';
+            }
+        });
         document.getElementById('btn-open-cinema').addEventListener('click', enterCinemaMode);
         document.getElementById('btn-exit-cinema').addEventListener('click', exitCinemaMode);
         document.getElementById('btn-add-kf').addEventListener('click', addCinemaKeyframe);

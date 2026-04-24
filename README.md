@@ -69,7 +69,7 @@ A web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
 | High | 2048×2048 | ~4M | Detailed visualization |
 | Very High | 4096×4096 | ~16M | High-end systems |
 | Extreme | 8192×8192 | ~64M | Workstation GPUs |
-| Extreme+ | 16384×16384 | ~256M | Maximum detail |
+| Extreme+ | 11585×11585 | ~128M | Maximum detail |
 
 ## 🛠️ Technical Architecture
 
