@@ -575,9 +575,18 @@
             <option value="1024" selected>Standard (1M Polys)</option>
             <option value="2048">High (4M Polys)</option>
             <option value="4096">Very High (16M Polys)</option>
+            <option value="5793">Ultra High (32M Polys)</option>
             <option value="8192">Extreme (64M Polys)</option>
             <option value="11585">Extreme+ (128M Polys)</option>
+            <option value="custom">Custom...</option>
         </select>
+        <div id="custom-res-container" style="display: none; margin-top: 10px;">
+            <label>Target Polys (Millions)</label>
+            <div style="display: flex; gap: 5px;">
+                <input type="number" id="custom-poly-input" min="0.1" max="1000" step="0.1" value="1.0" style="flex: 1; margin: 0;">
+                <button id="btn-apply-custom-res" class="btn btn-outline" style="width: auto; padding: 0 10px; margin: 0;">Apply</button>
+            </div>
+        </div>
         <div id="stat-display">Res: 1024x1024</div>
     </div>
 
@@ -1123,8 +1132,21 @@
         document.getElementById('flight-mode-toggle').addEventListener('click', toggleFlightMode);
 
         document.getElementById('resolution-selector').addEventListener('change', (e) => {
-            CHUNK_RES = parseInt(e.target.value);
-            triggerReload();
+            if (e.target.value === 'custom') {
+                document.getElementById('custom-res-container').style.display = 'block';
+            } else {
+                document.getElementById('custom-res-container').style.display = 'none';
+                CHUNK_RES = parseInt(e.target.value);
+                triggerReload();
+            }
+        });
+
+        document.getElementById('btn-apply-custom-res').addEventListener('click', () => {
+            const val = parseFloat(document.getElementById('custom-poly-input').value);
+            if (!isNaN(val) && val > 0) {
+                CHUNK_RES = Math.round(Math.sqrt(val * 1000000));
+                triggerReload();
+            }
         });
 
         document.getElementById('heightmap-upload').addEventListener('change', handleFileUpload);
@@ -2784,18 +2806,27 @@
     
     function generateGeoTiffPreviewFromArray(data, width, height) {
         const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        const imgData = ctx.createImageData(width, height);
+        const previewMax = 256;
+        let pw, ph;
+        if (width >= height) { pw = previewMax; ph = Math.max(1, Math.round((height / width) * previewMax)); }
+        else { ph = previewMax; pw = Math.max(1, Math.round((width / height) * previewMax)); }
         
-        for (let i = 0; i < data.length; i++) {
-            const norm = data[i] * 255;
-            const index = i * 4;
-            imgData.data[index] = norm;
-            imgData.data[index + 1] = norm;
-            imgData.data[index + 2] = norm;
-            imgData.data[index + 3] = 255;
+        canvas.width = pw;
+        canvas.height = ph;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(pw, ph);
+        
+        for (let y = 0; y < ph; y++) {
+            for (let x = 0; x < pw; x++) {
+                const srcX = Math.min(width - 1, Math.floor((x / pw) * width));
+                const srcY = Math.min(height - 1, Math.floor((y / ph) * height));
+                const norm = data[srcY * width + srcX] * 255;
+                const index = (y * pw + x) * 4;
+                imgData.data[index] = norm;
+                imgData.data[index + 1] = norm;
+                imgData.data[index + 2] = norm;
+                imgData.data[index + 3] = 255;
+            }
         }
         
         ctx.putImageData(imgData, 0, 0);
@@ -2850,18 +2881,35 @@
 
     function generateGeoTiffPreview(tiffData) {
         const { data, width, height } = tiffData;
-        const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d'); const imgData = ctx.createImageData(width, height);
+        const canvas = document.createElement('canvas');
+        const previewMax = 256;
+        let pw, ph;
+        if (width >= height) { pw = previewMax; ph = Math.max(1, Math.round((height / width) * previewMax)); }
+        else { ph = previewMax; pw = Math.max(1, Math.round((width / height) * previewMax)); }
+        
+        canvas.width = pw; canvas.height = ph;
+        const ctx = canvas.getContext('2d'); const imgData = ctx.createImageData(pw, ph);
+        
         let min = Infinity, max = -Infinity;
         for (let i = 0; i < data.length; i += 20) {
              const val = data[i];
              if (isValidElevation(val)) { if(val < min) min = val; if(val > max) max = val; }
         }
         const range = max - min || 1;
-        for (let i = 0; i < data.length; i++) {
-            let val = data[i]; if (!isValidElevation(val)) val = min; 
-            const norm = ((val - min) / range) * 255; const index = i * 4;
-            imgData.data[index] = norm; imgData.data[index+1] = norm; imgData.data[index+2] = norm; imgData.data[index+3] = 255;    
+        
+        for (let y = 0; y < ph; y++) {
+            for (let x = 0; x < pw; x++) {
+                const srcX = Math.min(width - 1, Math.floor((x / pw) * width));
+                const srcY = Math.min(height - 1, Math.floor((y / ph) * height));
+                let val = data[srcY * width + srcX];
+                if (!isValidElevation(val)) val = min;
+                const norm = ((val - min) / range) * 255;
+                const index = (y * pw + x) * 4;
+                imgData.data[index] = norm;
+                imgData.data[index + 1] = norm;
+                imgData.data[index + 2] = norm;
+                imgData.data[index + 3] = 255;
+            }
         }
         ctx.putImageData(imgData, 0, 0);
         document.getElementById('minimap-img').src = canvas.toDataURL();
