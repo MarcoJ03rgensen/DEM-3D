@@ -617,6 +617,18 @@
             </div>
         </div>
         <div id="stat-display">Res: 1024x1024</div>
+        <div id="chunk-controls" style="display: none; margin-top: 10px; border-top: 1px solid #333; padding-top: 8px;">
+            <label style="font-size: 0.7rem; margin-bottom: 6px; color: #8fbfff;">Chunk Streaming</label>
+            <label class="checkbox-label" title="Only keep chunks around the player loaded.">
+                <input type="radio" name="chunk-load-mode" id="chunk-load-nearby" checked> Stream nearby chunks
+            </label>
+            <label class="checkbox-label" title="Load every chunk in the DEM.">
+                <input type="radio" name="chunk-load-mode" id="chunk-load-all"> Load all chunks
+            </label>
+            <label class="checkbox-label" title="Hide loaded chunks that are outside your current camera view.">
+                <input type="checkbox" id="chunk-visibility-cull" checked> Hide off-screen chunks
+            </label>
+        </div>
     </div>
 
     <div class="control-group">
@@ -879,10 +891,16 @@
     let chunkLoadSessionId = 0;
     let chunkToastTimeout = null;
     let lastChunkCheckTime = 0;
+    let chunkLoadAll = false;
+    let chunkVisibilityCull = true;
+    let chunkHideSince = new Map();
     const CHUNK_CHECK_INTERVAL = 500; // ms between proximity checks
-    const CHUNK_LOAD_RADIUS = 3;    // Load chunks within this many chunk-widths of camera (e.g., 3 = 7x7 grid)
-    const CHUNK_UNLOAD_RADIUS = 4;  // Unload chunks outside this radius
+    const CHUNK_LOAD_RADIUS = 1;    // Load chunks within this many chunk-widths of camera (1 = 3x3 grid)
+    const CHUNK_UNLOAD_RADIUS = 2;  // Unload chunks outside this radius
+    const CHUNK_VISIBILITY_GRACE_MS = 1200;
     let lastPlayerChunkX = -1, lastPlayerChunkY = -1;
+    const chunkFrustum = new THREE.Frustum();
+    const chunkProjMatrix = new THREE.Matrix4();
 
     // --- Cinema / 4K Reel Export ---
     let isCinemaMode = false;
@@ -1179,6 +1197,26 @@
         });
 
         document.getElementById('heightmap-upload').addEventListener('change', handleFileUpload);
+        document.getElementById('chunk-load-nearby').addEventListener('change', (e) => {
+            if (!e.target.checked) return;
+            chunkLoadAll = false;
+            if (chunkingEnabled && activeGeoTiffImage) {
+                showChunkToast('Streaming nearby chunks only.', 2500);
+                loadChunksAroundCamera(activeGeoTiffImage);
+            }
+        });
+        document.getElementById('chunk-load-all').addEventListener('change', (e) => {
+            if (!e.target.checked) return;
+            chunkLoadAll = true;
+            if (chunkingEnabled && activeGeoTiffImage) {
+                showChunkToast('Loading full DEM chunk set...', 2500);
+                loadChunksAroundCamera(activeGeoTiffImage);
+            }
+        });
+        document.getElementById('chunk-visibility-cull').addEventListener('change', (e) => {
+            chunkVisibilityCull = !!e.target.checked;
+            updateChunkVisibility();
+        });
         
         document.getElementById('btn-export').addEventListener('click', exportGLB);
 
@@ -1253,12 +1291,33 @@
     // --- CORE TERRAIN BUILDER WITH CHUNKING ---
 
     function isValidElevation(val) {
-        if (isNaN(val) || !isFinite(val)) return false;
+        if (!Number.isFinite(val)) return false;
         if (demMetaData.noDataValue !== null && Math.abs(val - demMetaData.noDataValue) < 1e-5) return false;
         // Check common NoData flags and extreme outliers (e.g. >30km which shouldn't exist on Earth)
         if (val === -32768 || val === -9999 || val === -99999 || Math.abs(val) > 1e10) return false;
         if (val < -30000 || val > 30000) return false;
         return true;
+    }
+
+    function normalizeElevationToUnit(val, min, range) {
+        if (!isValidElevation(val)) return -1;
+        const norm = (val - min) / (range || 1);
+        if (!Number.isFinite(norm)) return -1;
+        if (norm < 0) return 0;
+        if (norm > 1) return 1;
+        return norm;
+    }
+
+    function sanitizeNormalizedHeights(heightArray) {
+        for (let i = 0; i < heightArray.length; i++) {
+            const v = heightArray[i];
+            if (!Number.isFinite(v) || v < 0) {
+                heightArray[i] = -1;
+            } else if (v > 1) {
+                heightArray[i] = 1;
+            }
+        }
+        return heightArray;
     }
 
     function buildTerrain(heights, width, height) {
@@ -1286,6 +1345,7 @@
         } else {
              processedHeightData = new Float32Array(heights);
         }
+           sanitizeNormalizedHeights(processedHeightData);
 
         const maxChunkVerts = 255;
         const segX = width - 1;
@@ -1333,7 +1393,8 @@
                 const getH = (x, y) => {
                     const safeX = Math.max(0, Math.min(width - 1, x));
                     const safeY = Math.max(0, Math.min(height - 1, y));
-                    return processedHeightData[safeY * width + safeX] * HEIGHT_SCALE;
+                    const v = processedHeightData[safeY * width + safeX];
+                    return (Number.isFinite(v) && v >= 0) ? (v * HEIGHT_SCALE) : 0;
                 };
 
                 for (let iy = 0; iy <= currentSegY; iy++) {
@@ -1419,7 +1480,8 @@
         const getH = (x, y) => {
             const safeX = Math.max(0, Math.min(width - 1, x));
             const safeY = Math.max(0, Math.min(height - 1, y));
-            return processedHeightData[safeY * width + safeX] * HEIGHT_SCALE;
+            const v = processedHeightData[safeY * width + safeX];
+            return (Number.isFinite(v) && v >= 0) ? (v * HEIGHT_SCALE) : 0;
         };
         
         terrainGroup.children.forEach(mesh => {
@@ -1462,6 +1524,20 @@
         if(terrainGroup.children.length === 0) return;
 
         let hiddenMeshes = [];
+        let temporarilyShownMeshes = [];
+
+        if (chunkingEnabled) {
+            for (const chunkData of loadedChunks.values()) {
+                if (!chunkData.meshes) continue;
+                chunkData.meshes.forEach((m) => {
+                    if (!m.visible) {
+                        m.visible = true;
+                        temporarilyShownMeshes.push(m);
+                    }
+                });
+            }
+        }
+
         if (chunkingEnabled) {
             if (confirm("You are currently in Chunked Mode.\n\nDo you want to isolate and export ONLY the chunk you are currently standing in?\n(Click OK for Current Chunk, or Cancel to export all loaded chunks)")) {
                 const { cx, cy } = getCameraChunkCoords();
@@ -1505,12 +1581,14 @@
                     document.body.removeChild( link );
                     loader.style.display = 'none';
                     hiddenMeshes.forEach(m => m.visible = true);
+                    temporarilyShownMeshes.forEach(m => m.visible = false);
                 },
                 function ( error ) { 
                     console.error( error ); 
                     alert('Export failed.'); 
                     loader.style.display = 'none'; 
                     hiddenMeshes.forEach(m => m.visible = true);
+                    temporarilyShownMeshes.forEach(m => m.visible = false);
                 },
                 { binary: true }
             );
@@ -1779,7 +1857,8 @@
         // Horizontal pass
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                if (heights[y * width + x] < 0) {
+                const baseVal = heights[y * width + x];
+                if (!Number.isFinite(baseVal) || baseVal < 0) {
                     temp[y * width + x] = -1;
                     continue;
                 }
@@ -1789,20 +1868,21 @@
                     const nx = x + dx;
                     if (nx >= 0 && nx < width) {
                         const h = heights[y * width + nx];
-                        if (h >= 0) {
+                        if (Number.isFinite(h) && h >= 0) {
                             sum += h;
                             count++;
                         }
                     }
                 }
-                temp[y * width + x] = count > 0 ? sum / count : heights[y * width + x];
+                temp[y * width + x] = count > 0 ? sum / count : baseVal;
             }
         }
 
         // Vertical pass
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                if (temp[y * width + x] < 0) {
+                const baseVal = temp[y * width + x];
+                if (!Number.isFinite(baseVal) || baseVal < 0) {
                     newHeights[y * width + x] = -1;
                     continue;
                 }
@@ -1812,13 +1892,13 @@
                     const ny = y + dy;
                     if (ny >= 0 && ny < height) {
                         const h = temp[ny * width + x];
-                        if (h >= 0) {
+                        if (Number.isFinite(h) && h >= 0) {
                             sum += h;
                             count++;
                         }
                     }
                 }
-                newHeights[y * width + x] = count > 0 ? sum / count : temp[y * width + x];
+                newHeights[y * width + x] = count > 0 ? sum / count : baseVal;
             }
         }
         return newHeights;
@@ -1959,6 +2039,7 @@
         }
         chunkingEnabled = false;
         chunkGrid = null;
+        setChunkControlsVisibility(false);
 
         const isMassiveFile = sourcePixels > 50000000; // > 50M pixels (e.g. > 7000x7000)
 
@@ -1980,6 +2061,7 @@
                 targetChunkH: readH
             };
             chunkingEnabled = true;
+            setChunkControlsVisibility(true);
 
             msg.innerText = `Large DEM detected (${(sourcePixels/1e6).toFixed(1)}M px). Chunking into ${chunksX}×${chunksY} tiles...`;
 
@@ -2016,6 +2098,8 @@
                 `Chunked: ${chunksX}×${chunksY} | ${readW}×${readH}/chunk | Source: ${sourceWidth}×${sourceHeight}`;
             return;
         }
+
+        setChunkControlsVisibility(false);
 
         // --- Original non-chunked path ---
         // Check if file is very large or needs high-quality downsampling to prevent aliasing ("lines")
@@ -2074,7 +2158,7 @@
         
         // Create output arrays
         const outputData = new Float32Array(targetWidth * targetHeight);
-        outputData.fill(-1);
+        outputData.fill(0);
         const outputCount = new Float32Array(targetWidth * targetHeight);
         let globalMin = Infinity;
         let globalMax = -Infinity;
@@ -2169,7 +2253,8 @@
                             const tileIdx = sy * w + sx;
                             let val = tileData[tileIdx];
                             if (isValidElevation(val)) {
-                                const norm = (val - globalMin) / range;
+                                const norm = normalizeElevationToUnit(val, globalMin, range);
+                                if (norm < 0) continue;
                                 
                                 if (tx0 >= 0 && tx0 < targetWidth && ty0 >= 0 && ty0 < targetHeight) {
                                     const idx = ty0 * targetWidth + tx0;
@@ -2209,7 +2294,12 @@
         }
 
         for (let i = 0; i < outputData.length; i++) {
-            if (outputCount[i] > 0) outputData[i] /= outputCount[i];
+            if (outputCount[i] > 0) {
+                outputData[i] = outputData[i] / outputCount[i];
+                if (!Number.isFinite(outputData[i])) outputData[i] = -1;
+            } else {
+                outputData[i] = -1;
+            }
         }
         
         // Simple hole filling in case of upsampling gaps
@@ -2217,10 +2307,14 @@
             let lastVal = outputData[y * targetWidth]; 
             for (let x = 0; x < targetWidth; x++) {
                 const idx = y * targetWidth + x;
-                if (outputCount[idx] === 0) outputData[idx] = lastVal;
-                else lastVal = outputData[idx];
+                if (outputCount[idx] === 0) {
+                    outputData[idx] = lastVal;
+                } else if (Number.isFinite(outputData[idx])) {
+                    lastVal = outputData[idx];
+                }
             }
         }
+        sanitizeNormalizedHeights(outputData);
         
         msg.innerText = 'Generating preview...';
         generateGeoTiffPreviewFromArray(outputData, targetWidth, targetHeight);
@@ -2256,6 +2350,7 @@
             }
         }
         loadedChunks.clear();
+        chunkHideSince.clear();
         chunkLoadQueue = [];
         isChunkLoading = false;
     }
@@ -2498,13 +2593,9 @@
             const range = demMetaData.max - demMetaData.min || 1;
             const heightData = new Float32Array(readW * readH);
             for (let i = 0; i < data.length; i++) {
-                let val = data[i];
-                if (!isValidElevation(val)) {
-                    heightData[i] = -1;
-                } else {
-                    heightData[i] = (val - demMetaData.min) / range;
-                }
+                heightData[i] = normalizeElevationToUnit(data[i], demMetaData.min, range);
             }
+            sanitizeNormalizedHeights(heightData);
 
             // Build mesh for this chunk
             const { meshes, processedH } = buildChunkMesh(heightData, readW, readH, cx, cy);
@@ -2517,6 +2608,7 @@
                 readW, readH,
                 cx, cy
             });
+            chunkHideSince.delete(key);
 
             updateMinimapWithChunk(cx, cy, heightData, readW, readH);
 
@@ -2529,6 +2621,7 @@
         } catch (e) {
             console.warn(`Chunk [${cx},${cy}] load failed:`, e.message);
             loadedChunks.set(key, { loading: false, failed: true });
+            chunkHideSince.delete(key);
         }
     }
 
@@ -2538,6 +2631,7 @@
 
         const isSmooth = document.getElementById('btn-smooth').checked;
         const processedH = isSmooth ? smoothHeights(heights, width, height) : heights;
+        sanitizeNormalizedHeights(processedH);
 
         const style = document.getElementById('texture-style').value;
         const material = new THREE.MeshStandardMaterial({
@@ -2587,7 +2681,7 @@
                     const safeX = Math.max(0, Math.min(width - 1, x));
                     const safeY = Math.max(0, Math.min(height - 1, y));
                     const val = processedH[safeY * width + safeX];
-                    return val >= 0 ? val * HEIGHT_SCALE : 0;
+                    return (Number.isFinite(val) && val >= 0) ? (val * HEIGHT_SCALE) : 0;
                 };
 
                 for (let iy = 0; iy <= currentSegY; iy++) {
@@ -2642,6 +2736,8 @@
 
                 geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
                 geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+                geometry.computeBoundingBox();
+                geometry.computeBoundingSphere();
 
                 const mesh = new THREE.Mesh(geometry, material);
                 mesh.castShadow = true;
@@ -2667,36 +2763,48 @@
         const unloadRadius = Math.ceil(CHUNK_UNLOAD_RADIUS);
 
         // 1. Unload distant chunks
-        for (const [key, chunkData] of loadedChunks.entries()) {
-            const parts = key.split(',');
-            const curCx = parseInt(parts[0]);
-            const curCy = parseInt(parts[1]);
-            const dist = Math.sqrt(Math.pow(curCx - cx, 2) + Math.pow(curCy - cy, 2));
+        if (!chunkLoadAll) {
+            for (const [key, chunkData] of loadedChunks.entries()) {
+                const curCx = Number.isFinite(chunkData.cx) ? chunkData.cx : parseInt(key.split(',')[0], 10);
+                const curCy = Number.isFinite(chunkData.cy) ? chunkData.cy : parseInt(key.split(',')[1], 10);
+                const dist = Math.hypot(curCx - cx, curCy - cy);
 
-            if (dist > unloadRadius) {
-                if (chunkData.meshes) {
-                    chunkData.meshes.forEach(m => {
-                        m.geometry.dispose();
-                        if (m.material) m.material.dispose();
-                        terrainGroup.remove(m);
-                    });
+                if (dist > unloadRadius) {
+                    if (chunkData.meshes) {
+                        chunkData.meshes.forEach(m => {
+                            m.geometry.dispose();
+                            if (m.material) m.material.dispose();
+                            terrainGroup.remove(m);
+                        });
+                    }
+                    loadedChunks.delete(key);
+                    chunkHideSince.delete(key);
                 }
-                loadedChunks.delete(key);
             }
         }
 
         // 2. Build list of chunks to load sorted by distance from camera chunk
         const toLoad = [];
-        for (let dy = -loadRadius; dy <= loadRadius; dy++) {
-            for (let dx = -loadRadius; dx <= loadRadius; dx++) {
-                const ncx = cx + dx;
-                const ncy = cy + dy;
-                if (ncx < 0 || ncx >= chunksX || ncy < 0 || ncy >= chunksY) continue;
-                const key = `${ncx},${ncy}`;
-                if (loadedChunks.has(key)) continue;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist <= CHUNK_LOAD_RADIUS + 0.5) {
-                    toLoad.push({ cx: ncx, cy: ncy, dist });
+        if (chunkLoadAll) {
+            for (let ncy = 0; ncy < chunksY; ncy++) {
+                for (let ncx = 0; ncx < chunksX; ncx++) {
+                    const key = `${ncx},${ncy}`;
+                    if (loadedChunks.has(key)) continue;
+                    toLoad.push({ cx: ncx, cy: ncy, dist: Math.hypot(ncx - cx, ncy - cy) });
+                }
+            }
+        } else {
+            for (let dy = -loadRadius; dy <= loadRadius; dy++) {
+                for (let dx = -loadRadius; dx <= loadRadius; dx++) {
+                    const ncx = cx + dx;
+                    const ncy = cy + dy;
+                    if (ncx < 0 || ncx >= chunksX || ncy < 0 || ncy >= chunksY) continue;
+                    const key = `${ncx},${ncy}`;
+                    if (loadedChunks.has(key)) continue;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist <= CHUNK_LOAD_RADIUS + 0.5) {
+                        toLoad.push({ cx: ncx, cy: ncy, dist });
+                    }
                 }
             }
         }
@@ -2723,6 +2831,7 @@
             }
         }
 
+        updateChunkVisibility();
         isChunkLoading = false;
     }
 
@@ -2738,21 +2847,94 @@
         const radius = Math.ceil(CHUNK_LOAD_RADIUS);
 
         let needsLoad = false;
-        for (let dy = -radius; dy <= radius && !needsLoad; dy++) {
-            for (let dx = -radius; dx <= radius && !needsLoad; dx++) {
-                const ncx = cx + dx;
-                const ncy = cy + dy;
-                if (ncx < 0 || ncx >= chunksX || ncy < 0 || ncy >= chunksY) continue;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist <= CHUNK_LOAD_RADIUS + 0.5 && !loadedChunks.has(`${ncx},${ncy}`)) {
-                    needsLoad = true;
+        if (chunkLoadAll) {
+            needsLoad = loadedChunks.size < (chunksX * chunksY);
+        } else {
+            for (let dy = -radius; dy <= radius && !needsLoad; dy++) {
+                for (let dx = -radius; dx <= radius && !needsLoad; dx++) {
+                    const ncx = cx + dx;
+                    const ncy = cy + dy;
+                    if (ncx < 0 || ncx >= chunksX || ncy < 0 || ncy >= chunksY) continue;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist <= CHUNK_LOAD_RADIUS + 0.5 && !loadedChunks.has(`${ncx},${ncy}`)) {
+                        needsLoad = true;
+                    }
                 }
             }
         }
 
         if (needsLoad && !isChunkLoading) {
-            showChunkToast('Loading nearby terrain chunks...', 3000);
+            showChunkToast(chunkLoadAll ? 'Loading all terrain chunks...' : 'Loading nearby terrain chunks...', 3000);
             loadChunksAroundCamera(activeGeoTiffImage);
+        }
+    }
+
+    function setChunkControlsVisibility(visible) {
+        const wrap = document.getElementById('chunk-controls');
+        if (!wrap) return;
+        wrap.style.display = visible ? 'block' : 'none';
+
+        if (!visible) {
+            chunkLoadAll = false;
+            chunkHideSince.clear();
+            const nearby = document.getElementById('chunk-load-nearby');
+            const all = document.getElementById('chunk-load-all');
+            if (nearby) nearby.checked = true;
+            if (all) all.checked = false;
+        }
+    }
+
+    function updateChunkVisibility() {
+        if (!chunkingEnabled || !chunkGrid || !camera) return;
+
+        const now = performance.now();
+        const { cx, cy } = getCameraChunkCoords();
+        const nearRadius = 2;
+
+        if (!chunkVisibilityCull) {
+            for (const chunkData of loadedChunks.values()) {
+                if (!chunkData.meshes) continue;
+                chunkData.meshes.forEach((mesh) => {
+                    mesh.visible = true;
+                });
+            }
+            chunkHideSince.clear();
+            return;
+        }
+
+        terrainGroup.updateMatrixWorld(true);
+        camera.updateMatrixWorld(true);
+        chunkProjMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        chunkFrustum.setFromProjectionMatrix(chunkProjMatrix);
+
+        for (const [key, chunkData] of loadedChunks.entries()) {
+            if (!chunkData.meshes || chunkData.meshes.length === 0) continue;
+
+            const chunkCx = Number.isFinite(chunkData.cx) ? chunkData.cx : cx;
+            const chunkCy = Number.isFinite(chunkData.cy) ? chunkData.cy : cy;
+            const nearPlayer = Math.hypot(chunkCx - cx, chunkCy - cy) <= nearRadius;
+
+            let visible = nearPlayer;
+            if (!visible) {
+                // If any submesh is inside the frustum, keep the chunk visible.
+                visible = chunkData.meshes.some((mesh) => chunkFrustum.intersectsObject(mesh));
+            }
+
+            if (visible) {
+                chunkHideSince.delete(key);
+            } else {
+                const hiddenSince = chunkHideSince.get(key);
+                if (!hiddenSince) {
+                    chunkHideSince.set(key, now);
+                    visible = true;
+                } else if (now - hiddenSince < CHUNK_VISIBILITY_GRACE_MS) {
+                    visible = true;
+                }
+            }
+
+            chunkData.meshes.forEach((mesh) => {
+                mesh.visible = visible;
+            });
         }
     }
 
@@ -2876,13 +3058,9 @@
         const range = max - min || 1;
         demMetaData.min = min; demMetaData.max = max;
         for (let i = 0; i < size; i++) {
-            let val = data[i];
-            if (!isValidElevation(val)) {
-                sampledHeights[i] = -1;
-            } else {
-                sampledHeights[i] = (val - min) / range;
-            }
+            sampledHeights[i] = normalizeElevationToUnit(data[i], min, range);
         }
+        sanitizeNormalizedHeights(sampledHeights);
         rawHeightData = sampledHeights;
 
         if (currentAspect >= 1) {
@@ -3866,6 +4044,7 @@
 
         // Progressive chunk loading
         checkAndLoadNearbyChunks();
+        updateChunkVisibility();
 
         // Cinema preview playback
         if (isCinemaPreview && _cinemaCurve) {
