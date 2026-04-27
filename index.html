@@ -825,7 +825,10 @@
     <div id="chunk-progress-bar"><div id="chunk-progress-fill"></div></div>
 </div>
 
-
+<!-- Satellite Credit Overlay -->
+<div id="satellite-credit" style="position: absolute; bottom: 10px; right: 10px; z-index: 25; background: rgba(0,0,0,0.6); color: rgba(255,255,255,0.7); padding: 4px 8px; border-radius: 4px; font-size: 0.65rem; display: none; backdrop-filter: blur(4px); pointer-events: none;">
+    Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community
+</div>
 
 <div id="canvas-container"></div>
 
@@ -1091,13 +1094,9 @@
             demMetaData.noDataValue = fileDirectory.GDAL_NODATA ? parseFloat(fileDirectory.GDAL_NODATA) : null;
             
             await extractGeographicBoundingBox(image, fileDirectory);
-            if (globalBoundingBox) {
-                document.getElementById('texture-style').value = 'satellite';
-                document.getElementById('loading-msg').innerText = "Fetching High-Res Satellite Imagery...";
-                await fetchAndApplySatellite();
-            } else {
-                document.getElementById('texture-style').value = 'grayscale';
-            }
+            document.getElementById('texture-style').value = 'grayscale';
+            const credit = document.getElementById('satellite-credit');
+            if (credit) credit.style.display = 'none';
             
             await reloadGeoTiff(image);
         } catch (err) {
@@ -1177,6 +1176,9 @@
         });
 
         document.getElementById('texture-style').addEventListener('change', async (e) => {
+            const credit = document.getElementById('satellite-credit');
+            if (credit) credit.style.display = e.target.value === 'satellite' ? 'block' : 'none';
+
             if (e.target.value === 'satellite' && !activeSatelliteTexture) {
                 const loader = document.getElementById('loading-indicator');
                 loader.style.display = 'block';
@@ -2052,13 +2054,9 @@
                 // Clear any previous satellite to force refresh, update dropdown, fetch, and load
                 if (activeSatelliteTexture) activeSatelliteTexture.dispose();
                 activeSatelliteTexture = null;
-                if (globalBoundingBox) {
-                    document.getElementById('texture-style').value = 'satellite';
-                    document.getElementById('loading-msg').innerText = "Fetching High-Res Satellite Imagery...";
-                    await fetchAndApplySatellite();
-                } else {
-                    document.getElementById('texture-style').value = 'grayscale';
-                }
+                document.getElementById('texture-style').value = 'grayscale';
+                const credit = document.getElementById('satellite-credit');
+                if (credit) credit.style.display = 'none';
                 
                 await reloadGeoTiff(image);
             } else {
