@@ -1,10 +1,10 @@
 {
   "name": "3D DEM Explorer",
   "short_name": "DEM 3D",
-  "description": "Explore Digital Elevation Models (DEM) in interactive 3D directly in your browser.",
-  "id": "../",
-  "start_url": "../",
-  "scope": "../",
+  "description": "Upload GeoTIFF terrain data, explore it in interactive 3D, and export PNG, MP4, or GLB outputs in your browser.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "android-chrome-192x192.png",
