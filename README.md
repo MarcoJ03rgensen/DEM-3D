@@ -14,6 +14,7 @@ A web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
   - Grayscale (Raw Height - Default)
   - Clay (Neutral)
   - Heatmap (Detailed elevation gradient)
+  - Satellite Imagery (High-res overlay mapped perfectly to DEM bounds)
 - **🖼️ Configurable Environments**:
   - Sky Blue
   - Greenscreen (Chroma Key) - for recording and composite work

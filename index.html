@@ -644,6 +644,7 @@
             <option value="grayscale" selected>Grayscale (Raw Height)</option>
             <option value="clay">Clay (Neutral)</option>
             <option value="heatmap">Heatmap (Detailed)</option>
+            <option value="satellite">Satellite Imagery</option>
         </select>
 
         <label style="margin-top:10px">Background Environment</label>
@@ -824,6 +825,8 @@
     <div id="chunk-progress-bar"><div id="chunk-progress-fill"></div></div>
 </div>
 
+
+
 <div id="canvas-container"></div>
 
 <script src="https://unpkg.com/mp4-muxer@3.0.0/build/mp4-muxer.js"></script>
@@ -833,7 +836,8 @@
         "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
             "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-            "geotiff": "https://cdn.jsdelivr.net/npm/geotiff@2.1.3/+esm"
+            "geotiff": "https://cdn.jsdelivr.net/npm/geotiff@2.1.3/+esm",
+            "proj4": "https://cdn.jsdelivr.net/npm/proj4@2.9.2/+esm"
         }
     }
 </script>
@@ -844,6 +848,7 @@
     import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
     import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
     import { fromBlob, Pool } from 'geotiff';
+    import proj4 from 'proj4';
 
     // --- Configuration ---
     const BASE_SIZE = 2000; 
@@ -876,6 +881,9 @@
     };
 
     let activeGeoTiffImage = null; 
+    let activeSatelliteTexture = null;
+    let isFetchingSatellite = false;
+    let globalBoundingBox = null; // { minLon, minLat, maxLon, maxLat }
     
     let isMobile = false;
     let touchLookStartX = 0, touchLookStartY = 0;
@@ -937,7 +945,7 @@
 
     function getAdaptiveReelSupersample(reelW, reelH) {
         // Extreme geometry already consumes massive VRAM; native 4K avoids context loss while keeping output sharp.
-        let supersample = CHUNK_RES >= 8192 ? 1 : REEL_SUPERSAMPLE;
+        let supersample = CHUNK_RES >= 4096 ? 1 : REEL_SUPERSAMPLE;
 
         const gl = renderer ? renderer.getContext() : null;
         const maxEdge = gl ? (gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 8192) : 8192;
@@ -1081,6 +1089,16 @@
             if (modelPixelScale && modelPixelScale.length >= 1) demMetaData.pixelScaleX = modelPixelScale[0];
             else demMetaData.pixelScaleX = 30; 
             demMetaData.noDataValue = fileDirectory.GDAL_NODATA ? parseFloat(fileDirectory.GDAL_NODATA) : null;
+            
+            await extractGeographicBoundingBox(image, fileDirectory);
+            if (globalBoundingBox) {
+                document.getElementById('texture-style').value = 'satellite';
+                document.getElementById('loading-msg').innerText = "Fetching High-Res Satellite Imagery...";
+                await fetchAndApplySatellite();
+            } else {
+                document.getElementById('texture-style').value = 'grayscale';
+            }
+            
             await reloadGeoTiff(image);
         } catch (err) {
             console.error(err);
@@ -1158,7 +1176,15 @@
             } else if(rawHeightData) buildTerrain(rawHeightData, window.terrainW, window.terrainH);
         });
 
-        document.getElementById('texture-style').addEventListener('change', () => {
+        document.getElementById('texture-style').addEventListener('change', async (e) => {
+            if (e.target.value === 'satellite' && !activeSatelliteTexture) {
+                const loader = document.getElementById('loading-indicator');
+                loader.style.display = 'block';
+                document.getElementById('loading-msg').innerText = "Fetching Satellite Imagery...";
+                await fetchAndApplySatellite();
+                loader.style.display = 'none';
+            }
+            
             if (chunkingEnabled) {
                 rebuildAllChunkMeshes();
             } else if(rawHeightData) buildTerrain(rawHeightData, window.terrainW, window.terrainH);
@@ -1355,8 +1381,12 @@
         const chunksY = Math.ceil(segY / maxChunkVerts);
         
         const style = document.getElementById('texture-style').value;
+        const isSatellite = (style === 'satellite' && activeSatelliteTexture);
+
         const material = new THREE.MeshStandardMaterial({ 
-            vertexColors: true, 
+            vertexColors: !isSatellite, 
+            color: isSatellite ? 0xffffff : 0xffffff,
+            map: isSatellite ? activeSatelliteTexture : null,
             roughness: (style === 'clay') ? 0.6 : 0.8, 
             flatShading: !isSmooth,
             transparent: true,
@@ -1454,6 +1484,18 @@
 
                 geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
                 geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+                
+                // Map global UVs for Satellite Texture
+                const uvs = geometry.attributes.uv.array;
+                for(let i=0; i<uvs.length/2; i++) {
+                    const worldX = vertices[i*3];
+                    const worldZ = vertices[i*3+2];
+                    const globU = (worldX + currentWorldWidth / 2) / currentWorldWidth;
+                    const globV = (worldZ + currentWorldDepth / 2) / currentWorldDepth; // top down
+                    uvs[i*2] = globU;
+                    uvs[i*2+1] = 1.0 - globV; // Flip V to match canvas orientation
+                }
+                geometry.getAttribute('uv').needsUpdate = true;
                 
                 geometry.userData = { startX, startY, segX: currentSegX, segY: currentSegY };
 
@@ -1715,7 +1757,7 @@
                 outputH = Math.max(1, Math.floor(outputH * scale));
             }
 
-            let supersample = Math.min(PNG_EXPORT_SUPERSAMPLE, maxEdge / Math.max(outputW, outputH));
+            let supersample = (CHUNK_RES >= 4096) ? 1 : Math.min(PNG_EXPORT_SUPERSAMPLE, maxEdge / Math.max(outputW, outputH));
             if (!Number.isFinite(supersample) || supersample < 1) supersample = 1;
 
             const renderW = Math.max(1, Math.floor(outputW * supersample));
@@ -2004,6 +2046,20 @@
                 if (modelPixelScale && modelPixelScale.length >= 1) demMetaData.pixelScaleX = modelPixelScale[0];
                 else demMetaData.pixelScaleX = 30; 
                 demMetaData.noDataValue = fileDirectory.GDAL_NODATA ? parseFloat(fileDirectory.GDAL_NODATA) : null;
+                
+                await extractGeographicBoundingBox(image, fileDirectory);
+                
+                // Clear any previous satellite to force refresh, update dropdown, fetch, and load
+                if (activeSatelliteTexture) activeSatelliteTexture.dispose();
+                activeSatelliteTexture = null;
+                if (globalBoundingBox) {
+                    document.getElementById('texture-style').value = 'satellite';
+                    document.getElementById('loading-msg').innerText = "Fetching High-Res Satellite Imagery...";
+                    await fetchAndApplySatellite();
+                } else {
+                    document.getElementById('texture-style').value = 'grayscale';
+                }
+                
                 await reloadGeoTiff(image);
             } else {
                 alert("Only GeoTIFF files (.tif, .tiff) are supported.");
@@ -2634,8 +2690,12 @@
         sanitizeNormalizedHeights(processedH);
 
         const style = document.getElementById('texture-style').value;
+        const isSatellite = (style === 'satellite' && activeSatelliteTexture);
+
         const material = new THREE.MeshStandardMaterial({
-            vertexColors: true,
+            vertexColors: !isSatellite,
+            color: isSatellite ? 0xffffff : 0xffffff,
+            map: isSatellite ? activeSatelliteTexture : null,
             roughness: (style === 'clay') ? 0.6 : 0.8,
             flatShading: !isSmooth,
             transparent: true,
@@ -2736,6 +2796,18 @@
 
                 geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
                 geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+                
+                const uvs = geometry.attributes.uv.array;
+                for(let i=0; i<uvs.length/2; i++) {
+                    const worldX = vertices[i*3];
+                    const worldZ = vertices[i*3+2];
+                    const globU = (worldX + currentWorldWidth / 2) / currentWorldWidth;
+                    const globV = (worldZ + currentWorldDepth / 2) / currentWorldDepth;
+                    uvs[i*2] = globU;
+                    uvs[i*2+1] = 1.0 - globV; // Flip V to match canvas orientation
+                }
+                geometry.getAttribute('uv').needsUpdate = true;
+
                 geometry.computeBoundingBox();
                 geometry.computeBoundingSphere();
 
@@ -3044,9 +3116,171 @@
         document.getElementById('minimap-img').src = canvas.toDataURL();
     }
 
+    async function extractGeographicBoundingBox(image, fileDirectory) {
+        globalBoundingBox = null;
+        const tp = fileDirectory.ModelTiepoint;
+        const scale = fileDirectory.ModelPixelScale;
+        if (!tp || !scale) return;
+
+        let leftX = tp[3];
+        let topY = tp[4];
+        let rightX = leftX + (image.getWidth() * scale[0]);
+        let bottomY = topY - (image.getHeight() * scale[1]); // Image builds downwards
+
+        const geoKeys = image.getGeoKeys();
+        if(!geoKeys) return;
+
+        const isGeo = geoKeys.GeographicTypeGeoKey;
+        const isProj = geoKeys.ProjectedCSTypeGeoKey;
+        
+        let projDef = null;
+        if (isProj === 3857 || isProj === 900913 || isProj === 102100) {
+            // Web Mercator
+            projDef = "EPSG:3857";
+        } else if (isProj && isProj !== 4326) {
+            try {
+                // Dynamically fetch proj4 definition for this EPSG code
+                const fetchedProj = await fetch(`https://epsg.io/${isProj}.proj4`).then(r => r.text());
+                proj4.defs(`EPSG:${isProj}`, fetchedProj);
+                projDef = `EPSG:${isProj}`;
+            } catch(e) {
+                console.warn("Could not fetch EPSG definition for: ", isProj);
+            }
+        }
+
+        if (projDef || (isGeo && isGeo !== 4326)) {
+            // Convert from local to WGS84
+            const fromProj = projDef || `EPSG:${isGeo}`;
+            try {
+                const topLeft = proj4(fromProj, "EPSG:4326", [leftX, topY]);
+                const bottomRight = proj4(fromProj, "EPSG:4326", [rightX, bottomY]);
+                globalBoundingBox = {
+                    minLon: topLeft[0],
+                    minLat: bottomRight[1],
+                    maxLon: bottomRight[0],
+                    maxLat: topLeft[1]
+                };
+            } catch(e) {
+                console.warn("Proj4 conversion failed:", e);
+            }
+        } else {
+            // Already WGS84
+            globalBoundingBox = {
+                minLon: leftX,
+                minLat: bottomY,
+                maxLon: rightX,
+                maxLat: topY
+            };
+        }
+        console.log("Calculated Bounding Box: ", globalBoundingBox);
+    }
+
+    async function fetchAndApplySatellite() {
+        if (!globalBoundingBox) {
+            alert("No geographic bounding box found in TIFF. Cannot load satellite overlay.");
+            document.getElementById('texture-style').value = 'grayscale';
+            return;
+        }
+
+        const { minLon, maxLon, minLat, maxLat } = globalBoundingBox;
+
+        // Math to calculate Slippy Map Tile numbers
+        function lon2tile(lon, zoom) { return (Math.floor((lon + 180) / 360 * Math.pow(2, zoom))); }
+        function lat2tile(lat, zoom)  { return (Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom))); }
+        function tile2lon(x, z) { return (x / Math.pow(2, z) * 360 - 180); }
+        function tile2lat(y, z) { 
+            const n = Math.PI - 2 * Math.PI * y / Math.pow(2, z);
+            return (180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)))); 
+        }
+
+        // Auto select zoom level based on area
+        let zoom = 10;
+        let xMin, xMax, yMin, yMax, tilesX, tilesY;
+        // Search for a zoom level that gives us roughly 4-16 tiles max on any axis (avoid overloading)
+        for (let z = 18; z >= 0; z--) {
+            xMin = lon2tile(minLon, z);
+            xMax = lon2tile(maxLon, z);
+            yMin = lat2tile(maxLat, z); // Top latitude > lower tile Y
+            yMax = lat2tile(minLat, z);
+            tilesX = xMax - xMin + 1;
+            tilesY = yMax - yMin + 1;
+            if (tilesX <= 16 && tilesY <= 16) {
+                zoom = z;
+                break;
+            }
+        }
+
+        console.log(`Fetching satellite tiles at zoom ${zoom}. Grid: ${tilesX}x${tilesY}`);
+
+        const tileSize = 256;
+        const totalW = tilesX * tileSize;
+        const totalH = tilesY * tileSize;
+
+        const tileCanvas = document.createElement('canvas');
+        tileCanvas.width = totalW;
+        tileCanvas.height = totalH;
+        const tileCtx = tileCanvas.getContext('2d');
+
+        // Draw fetched tiles
+        const promises = [];
+        for (let x = xMin; x <= xMax; x++) {
+            for (let y = yMin; y <= yMax; y++) {
+                const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${y}/${x}`;
+                promises.push(new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = "Anonymous";
+                    img.onload = () => {
+                        const px = (x - xMin) * tileSize;
+                        const py = (y - yMin) * tileSize;
+                        tileCtx.drawImage(img, px, py);
+                        resolve();
+                    };
+                    img.onerror = resolve; // just skip on error
+                    img.src = url;
+                }));
+            }
+        }
+        await Promise.all(promises);
+
+        // Crop precisely to bounding box footprint
+        const boundLeftX = lon2tile(minLon, zoom);
+        const boundRightX = lon2tile(maxLon, zoom);
+        const boundTopY = lat2tile(maxLat, zoom);
+        const boundBottomY = lat2tile(minLat, zoom);
+
+        // Pixel diff
+        const fXMin = (minLon - tile2lon(xMin, zoom)) / (tile2lon(xMin+1, zoom) - tile2lon(xMin, zoom)) * tileSize;
+        const fYMin = (maxLat - tile2lat(yMin, zoom)) / (tile2lat(yMin+1, zoom) - tile2lat(yMin, zoom)) * tileSize;
+        const fXMax = (maxLon - tile2lon(xMax, zoom)) / (tile2lon(xMax+1, zoom) - tile2lon(xMax, zoom)) * tileSize + (xMax - xMin)*tileSize;
+        const fYMax = (minLat - tile2lat(yMax, zoom)) / (tile2lat(yMax+1, zoom) - tile2lat(yMax, zoom)) * tileSize + (yMax - yMin)*tileSize;
+
+        const cropW = Math.abs(fXMax - fXMin);
+        const cropH = Math.abs(fYMax - fYMin);
+
+        const cropAspect = cropW / cropH;
+        const cropCanvas = document.createElement('canvas');
+        
+        // Ensure NO side exceeds 4096 to prevent memory crashes on export and WebGL context limits
+        const MAX_TEX_DIM = 4096;
+        if (cropAspect >= 1) {
+            cropCanvas.width = Math.min(MAX_TEX_DIM, Math.round(cropW));
+            cropCanvas.height = Math.round(cropCanvas.width / cropAspect);
+        } else {
+            cropCanvas.height = Math.min(MAX_TEX_DIM, Math.round(cropH));
+            cropCanvas.width = Math.round(cropCanvas.height * cropAspect);
+        }
+        
+        const cropCtx = cropCanvas.getContext('2d');
+        
+        cropCtx.drawImage(tileCanvas, fXMin, fYMin, cropW, cropH, 0, 0, cropCanvas.width, cropCanvas.height);
+        
+        if (activeSatelliteTexture) activeSatelliteTexture.dispose();
+        activeSatelliteTexture = new THREE.CanvasTexture(cropCanvas);
+        activeSatelliteTexture.colorSpace = THREE.SRGBColorSpace;
+    }
+
     function processGeoTiffData(tiffData) {
         const { data, width, height } = tiffData;
-        const loader = document.getElementById('loading-indicator');
         const size = width * height;
         const sampledHeights = new Float32Array(size);
         let min = Infinity, max = -Infinity;
@@ -3074,7 +3308,10 @@
 
         buildTerrain(sampledHeights, width, height);
         alignPlayerToTerrain(true);
-        loader.style.display = 'none';
+        if (typeof document !== 'undefined') {
+            const loader = document.getElementById('loading-indicator');
+            if (loader) loader.style.display = 'none';
+        }
     }
 
     function triggerReload() {
