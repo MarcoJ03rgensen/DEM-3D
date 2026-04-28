@@ -1385,6 +1385,26 @@
         const style = document.getElementById('texture-style').value;
         const isSatellite = (style === 'satellite' && activeSatelliteTexture);
 
+        let tlU = 0, tlV = 0, trU = 1, trV = 0, blU = 0, blV = 1, brU = 1, brV = 1;
+        if (isSatellite && globalBoundingBox && globalBoundingBox.cornersWGS84) {
+            const lon2tile = (lon) => ((lon + 180) / 360);
+            const lat2tile = (lat) => ((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2);
+            
+            const minX = lon2tile(globalBoundingBox.minLon);
+            const maxX = lon2tile(globalBoundingBox.maxLon);
+            const minY = lat2tile(globalBoundingBox.maxLat);
+            const maxY = lat2tile(globalBoundingBox.minLat);
+            
+            const mapU = (lon) => (lon2tile(lon) - minX) / (maxX - minX);
+            const mapV = (lat) => (lat2tile(lat) - minY) / (maxY - minY);
+            
+            const c = globalBoundingBox.cornersWGS84;
+            tlU = mapU(c.topLeft[0]); tlV = mapV(c.topLeft[1]);
+            trU = mapU(c.topRight[0]); trV = mapV(c.topRight[1]);
+            blU = mapU(c.bottomLeft[0]); blV = mapV(c.bottomLeft[1]);
+            brU = mapU(c.bottomRight[0]); brV = mapV(c.bottomRight[1]);
+        }
+
         const material = new THREE.MeshStandardMaterial({ 
             vertexColors: !isSatellite, 
             color: isSatellite ? 0xffffff : 0xffffff,
@@ -1495,8 +1515,19 @@
                     const worldZ = vertices[i*3+2];
                     const globU = (worldX + currentWorldWidth / 2) / currentWorldWidth;
                     const globV = (worldZ + currentWorldDepth / 2) / currentWorldDepth; // top down
-                    uvs[i*2] = globU;
-                    uvs[i*2+1] = 1.0 - globV; // Flip V to match canvas orientation
+                    
+                    if (isSatellite && globalBoundingBox && globalBoundingBox.cornersWGS84) {
+                        const topU = tlU + globU * (trU - tlU);
+                        const botU = blU + globU * (brU - blU);
+                        uvs[i*2] = topU + globV * (botU - topU);
+
+                        const topV = tlV + globU * (trV - tlV);
+                        const botV = blV + globU * (brV - blV);
+                        uvs[i*2+1] = 1.0 - (topV + globV * (botV - topV));
+                    } else {
+                        uvs[i*2] = globU;
+                        uvs[i*2+1] = 1.0 - globV; // Flip V to match canvas orientation
+                    }
                 }
                 geometry.getAttribute('uv').needsUpdate = true;
                 
@@ -2728,6 +2759,26 @@
         const style = document.getElementById('texture-style').value;
         const isSatellite = (style === 'satellite' && activeSatelliteTexture);
 
+        let tlU = 0, tlV = 0, trU = 1, trV = 0, blU = 0, blV = 1, brU = 1, brV = 1;
+        if (isSatellite && globalBoundingBox && globalBoundingBox.cornersWGS84) {
+            const lon2tile = (lon) => ((lon + 180) / 360);
+            const lat2tile = (lat) => ((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2);
+            
+            const minX = lon2tile(globalBoundingBox.minLon);
+            const maxX = lon2tile(globalBoundingBox.maxLon);
+            const minY = lat2tile(globalBoundingBox.maxLat);
+            const maxY = lat2tile(globalBoundingBox.minLat);
+            
+            const mapU = (lon) => (lon2tile(lon) - minX) / (maxX - minX);
+            const mapV = (lat) => (lat2tile(lat) - minY) / (maxY - minY);
+            
+            const c = globalBoundingBox.cornersWGS84;
+            tlU = mapU(c.topLeft[0]); tlV = mapV(c.topLeft[1]);
+            trU = mapU(c.topRight[0]); trV = mapV(c.topRight[1]);
+            blU = mapU(c.bottomLeft[0]); blV = mapV(c.bottomLeft[1]);
+            brU = mapU(c.bottomRight[0]); brV = mapV(c.bottomRight[1]);
+        }
+
         const material = new THREE.MeshStandardMaterial({
             vertexColors: !isSatellite,
             color: isSatellite ? 0xffffff : 0xffffff,
@@ -2840,8 +2891,19 @@
                     const worldZ = vertices[i*3+2];
                     const globU = (worldX + currentWorldWidth / 2) / currentWorldWidth;
                     const globV = (worldZ + currentWorldDepth / 2) / currentWorldDepth;
-                    uvs[i*2] = globU;
-                    uvs[i*2+1] = 1.0 - globV; // Flip V to match canvas orientation
+                    
+                    if (isSatellite && globalBoundingBox && globalBoundingBox.cornersWGS84) {
+                        const topU = tlU + globU * (trU - tlU);
+                        const botU = blU + globU * (brU - blU);
+                        uvs[i*2] = topU + globV * (botU - topU);
+
+                        const topV = tlV + globU * (trV - tlV);
+                        const botV = blV + globU * (brV - blV);
+                        uvs[i*2+1] = 1.0 - (topV + globV * (botV - topV));
+                    } else {
+                        uvs[i*2] = globU;
+                        uvs[i*2+1] = 1.0 - globV; // Flip V to match canvas orientation
+                    }
                 }
                 geometry.getAttribute('uv').needsUpdate = true;
 
@@ -3191,12 +3253,19 @@
             const fromProj = projDef || `EPSG:${isGeo}`;
             try {
                 const topLeft = proj4(fromProj, "EPSG:4326", [leftX, topY]);
+                const topRight = proj4(fromProj, "EPSG:4326", [rightX, topY]);
+                const bottomLeft = proj4(fromProj, "EPSG:4326", [leftX, bottomY]);
                 const bottomRight = proj4(fromProj, "EPSG:4326", [rightX, bottomY]);
+                
+                const lons = [topLeft[0], topRight[0], bottomLeft[0], bottomRight[0]];
+                const lats = [topLeft[1], topRight[1], bottomLeft[1], bottomRight[1]];
+                
                 globalBoundingBox = {
-                    minLon: topLeft[0],
-                    minLat: bottomRight[1],
-                    maxLon: bottomRight[0],
-                    maxLat: topLeft[1]
+                    minLon: Math.min(...lons),
+                    minLat: Math.min(...lats),
+                    maxLon: Math.max(...lons),
+                    maxLat: Math.max(...lats),
+                    cornersWGS84: { topLeft, topRight, bottomLeft, bottomRight }
                 };
             } catch(e) {
                 console.warn("Proj4 conversion failed:", e);
@@ -3207,7 +3276,13 @@
                 minLon: leftX,
                 minLat: bottomY,
                 maxLon: rightX,
-                maxLat: topY
+                maxLat: topY,
+                cornersWGS84: { 
+                    topLeft: [leftX, topY], 
+                    topRight: [rightX, topY], 
+                    bottomLeft: [leftX, bottomY], 
+                    bottomRight: [rightX, bottomY] 
+                }
             };
         }
         console.log("Calculated Bounding Box: ", globalBoundingBox);
@@ -3286,11 +3361,14 @@
         const boundTopY = lat2tile(maxLat, zoom);
         const boundBottomY = lat2tile(minLat, zoom);
 
-        // Pixel diff
-        const fXMin = (minLon - tile2lon(xMin, zoom)) / (tile2lon(xMin+1, zoom) - tile2lon(xMin, zoom)) * tileSize;
-        const fYMin = (maxLat - tile2lat(yMin, zoom)) / (tile2lat(yMin+1, zoom) - tile2lat(yMin, zoom)) * tileSize;
-        const fXMax = (maxLon - tile2lon(xMax, zoom)) / (tile2lon(xMax+1, zoom) - tile2lon(xMax, zoom)) * tileSize + (xMax - xMin)*tileSize;
-        const fYMax = (minLat - tile2lat(yMax, zoom)) / (tile2lat(yMax+1, zoom) - tile2lat(yMax, zoom)) * tileSize + (yMax - yMin)*tileSize;
+        // Exact Web Mercator pixel projection
+        const lon2tileFloat = (lon, z) => ((lon + 180) / 360 * Math.pow(2, z));
+        const lat2tileFloat = (lat, z) => ((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
+
+        const fXMin = (lon2tileFloat(minLon, zoom) - xMin) * tileSize;
+        const fYMin = (lat2tileFloat(maxLat, zoom) - yMin) * tileSize;
+        const fXMax = (lon2tileFloat(maxLon, zoom) - xMin) * tileSize;
+        const fYMax = (lat2tileFloat(minLat, zoom) - yMin) * tileSize;
 
         const cropW = Math.abs(fXMax - fXMin);
         const cropH = Math.abs(fYMax - fYMin);
