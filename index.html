@@ -1159,8 +1159,8 @@
             HEIGHT_SCALE = parseInt(e.target.value);
             if (chunkingEnabled) {
                 if (rebuildTimeout) clearTimeout(rebuildTimeout);
-                rebuildTimeout = setTimeout(() => {
-                    rebuildAllChunkMeshes();
+                rebuildTimeout = setTimeout(async () => {
+                    await rebuildAllChunkMeshes();
                     alignPlayerToTerrain(true);
                 }, 150);
             } else {
@@ -1169,10 +1169,10 @@
             }
         });
 
-        document.getElementById('btn-smooth').addEventListener('change', () => {
+        document.getElementById('btn-smooth').addEventListener('change', async () => {
             if (chunkingEnabled) {
-                rebuildAllChunkMeshes();
-            } else if(rawHeightData) buildTerrain(rawHeightData, window.terrainW, window.terrainH);
+                await rebuildAllChunkMeshes();
+            } else if(rawHeightData) await buildTerrain(rawHeightData, window.terrainW, window.terrainH);
         });
 
         document.getElementById('texture-style').addEventListener('change', async (e) => {
@@ -1188,8 +1188,8 @@
             }
             
             if (chunkingEnabled) {
-                rebuildAllChunkMeshes();
-            } else if(rawHeightData) buildTerrain(rawHeightData, window.terrainW, window.terrainH);
+                await rebuildAllChunkMeshes();
+            } else if(rawHeightData) await buildTerrain(rawHeightData, window.terrainW, window.terrainH);
         });
 
         document.getElementById('bg-style').addEventListener('change', (e) => {
@@ -1348,7 +1348,7 @@
         return heightArray;
     }
 
-    function buildTerrain(heights, width, height) {
+    async function buildTerrain(heights, width, height) {
         while(terrainGroup.children.length > 0){ 
             const mesh = terrainGroup.children[0];
             mesh.geometry.dispose();
@@ -1369,9 +1369,9 @@
 
         const isSmooth = document.getElementById('btn-smooth').checked;
         if (isSmooth) {
-             processedHeightData = smoothHeights(heights, width, height);
+             processedHeightData = await smoothHeights(heights, width, height);
         } else {
-             processedHeightData = new Float32Array(heights);
+             processedHeightData = heights; // same as buildChunkMesh
         }
            sanitizeNormalizedHeights(processedHeightData);
 
@@ -1397,6 +1397,7 @@
 
         for (let y = 0; y < chunksY; y++) {
             for (let x = 0; x < chunksX; x++) {
+                if (x % 2 === 0) await new Promise(r => setTimeout(r, 0));
                 
                 const startX = x * maxChunkVerts;
                 const startY = y * maxChunkVerts;
@@ -1456,8 +1457,8 @@
                         
                         // Get unscaled normalized height for colors
                         const dataIdx = Math.min(globalY, height - 1) * width + Math.min(globalX, width - 1);
-                        const normH = processedHeightData[dataIdx];
-
+                        const normH = processedHeightData[dataIdx] || 0; // Handle potentially undefined output
+                        
                         if (normH < 0) {
                             colors.push(0, 0, 0, 0);
                         } else {
@@ -1892,7 +1893,7 @@
         }
     }
 
-    function smoothHeights(heights, width, height) {
+    async function smoothHeights(heights, width, height) {
         // Dynamic blur radius based on detail level. Baseline minimum of 2 for smooth Low/Medium renders.
         const radius = Math.min(4, Math.max(2, Math.floor(width / 256)));
         const temp = new Float32Array(heights.length);
@@ -1900,6 +1901,7 @@
 
         // Horizontal pass
         for (let y = 0; y < height; y++) {
+            if (y % 64 === 0) await new Promise(r => setTimeout(r, 0));
             for (let x = 0; x < width; x++) {
                 const baseVal = heights[y * width + x];
                 if (!Number.isFinite(baseVal) || baseVal < 0) {
@@ -1924,6 +1926,7 @@
 
         // Vertical pass
         for (let y = 0; y < height; y++) {
+            if (y % 64 === 0) await new Promise(r => setTimeout(r, 0));
             for (let x = 0; x < width; x++) {
                 const baseVal = temp[y * width + x];
                 if (!Number.isFinite(baseVal) || baseVal < 0) {
@@ -2022,29 +2025,55 @@
     // Include existing file/image logic...
     async function handleFileUpload(event) {
         const file = event.target.files[0]; if (!file) return;
-        
-        // Remove existing terrain immediately
-        while(terrainGroup.children.length > 0){ 
-            const mesh = terrainGroup.children[0];
-            mesh.geometry.dispose();
-            if(mesh.material) mesh.material.dispose();
-            terrainGroup.remove(mesh);
-        }
-        if (typeof clearAllChunks === 'function') clearAllChunks();
-        
+
         const loader = document.getElementById('loading-indicator'); loader.style.display = 'block';
-        const name = file.name.toLowerCase(); document.getElementById('minimap-title').innerText = file.name;
+        const name = file.name.toLowerCase();
 
         try {
             if (name.endsWith('.tif') || name.endsWith('.tiff')) {
                 const tiff = await fromBlob(file);
                 const image = await tiff.getImage();
+                
+                const sourceWidth = image.getWidth();
+                const sourceHeight = image.getHeight();
+                const aspect = sourceWidth / sourceHeight;
+                
+                let targetRes = CHUNK_RES;
+                let readW, readH;
+                if (aspect >= 1) { readW = targetRes; readH = Math.round(targetRes / aspect); } 
+                else { readH = targetRes; readW = Math.round(targetRes * aspect); }
+
+                const budgetPixels = readW * readH;
+                const sourcePixels = sourceWidth * sourceHeight;
+                const chunkingRatio = sourcePixels / budgetPixels;
+                const isMassiveFile = sourcePixels > 50000000;
+                
+                const willChunk = (chunkingRatio > 2.5 && targetRes >= 2048) || isMassiveFile;
+                
+                if (willChunk) {
+                    const proceed = confirm("WARNING: The file you uploaded activates experimental chunking because it is very large.\n\nThis feature is not fully optimized and may cause crashes.\n\nClick 'Cancel' to go back and upload a smaller file, or 'OK' to enter experimental mode (currently not recommended).");
+                    if (!proceed) {
+                        loader.style.display = 'none';
+                        event.target.value = '';
+                        return;
+                    }
+                }
+
+                // NOW we can safely clear the old terrain
+                while(terrainGroup.children.length > 0){ 
+                    const mesh = terrainGroup.children[0];
+                    mesh.geometry.dispose();
+                    if(mesh.material) mesh.material.dispose();
+                    terrainGroup.remove(mesh);
+                }
+                if (typeof clearAllChunks === 'function') clearAllChunks();
+                document.getElementById('minimap-title').innerText = file.name;
+
                 activeGeoTiffImage = image;
-                const rawWidth = image.getWidth(); const rawHeight = image.getHeight();
-                currentAspect = rawWidth / rawHeight;
+                currentAspect = aspect;
                 const fileDirectory = image.getFileDirectory();
                 const modelPixelScale = fileDirectory.ModelPixelScale;
-                demMetaData.rawWidth = rawWidth; demMetaData.rawHeight = rawHeight; demMetaData.hasMetadata = true;
+                demMetaData.rawWidth = sourceWidth; demMetaData.rawHeight = sourceHeight; demMetaData.hasMetadata = true;
                 if (modelPixelScale && modelPixelScale.length >= 1) demMetaData.pixelScaleX = modelPixelScale[0];
                 else demMetaData.pixelScaleX = 30; 
                 demMetaData.noDataValue = fileDirectory.GDAL_NODATA ? parseFloat(fileDirectory.GDAL_NODATA) : null;
@@ -2058,15 +2087,16 @@
                 const credit = document.getElementById('satellite-credit');
                 if (credit) credit.style.display = 'none';
                 
-                await reloadGeoTiff(image);
+                await reloadGeoTiff(image, true);
             } else {
                 alert("Only GeoTIFF files (.tif, .tiff) are supported.");
                 loader.style.display = 'none';
+                event.target.value = '';
             }
-        } catch (err) { console.error(err); alert("Error: " + err.message); loader.style.display = 'none'; }
+        } catch (err) { console.error(err); alert("Error: " + err.message); loader.style.display = 'none'; event.target.value = ''; }
     }
 
-    async function reloadGeoTiff(image) {
+    async function reloadGeoTiff(image, skipConfirm = false) {
         const loader = document.getElementById('loading-indicator'); const msg = document.getElementById('loading-msg');
         const sourceWidth = image.getWidth();
         const sourceHeight = image.getHeight();
@@ -2081,6 +2111,17 @@
         const budgetPixels = readW * readH;
         const sourcePixels = sourceWidth * sourceHeight;
         const chunkingRatio = sourcePixels / budgetPixels;
+        const isMassiveFile = sourcePixels > 50000000; // > 50M pixels (e.g. > 7000x7000)
+        
+        const willChunk = (chunkingRatio > 2.5 && targetRes >= 2048) || isMassiveFile;
+
+        if (willChunk && !skipConfirm) {
+            const proceed = confirm("WARNING: The file you uploaded activates experimental chunking because it is very large.\n\nThis feature is not fully optimized and may cause crashes.\n\nClick 'Cancel' to go back and upload a smaller file, or 'OK' to enter experimental mode (currently not recommended).");
+            if (!proceed) {
+                loader.style.display = 'none';
+                return false;
+            }
+        }
 
         // Reset chunking state
         chunkLoadSessionId++;
@@ -2095,9 +2136,7 @@
         chunkGrid = null;
         setChunkControlsVisibility(false);
 
-        const isMassiveFile = sourcePixels > 50000000; // > 50M pixels (e.g. > 7000x7000)
-
-        if ((chunkingRatio > 2.5 && targetRes >= 2048) || isMassiveFile) {
+        if (willChunk) {
             // Let's base chunks on source pixels. 1 chunk = ~2000x2000 source pixels (like ringborgcrop).
             const preferredChunkSize = 2000; 
             const chunksX = Math.max(2, Math.ceil(sourceWidth / preferredChunkSize));
@@ -2198,7 +2237,7 @@
                 return; 
             }
             generateGeoTiffPreview({ data: rasters[0], width: readW, height: readH });
-            processGeoTiffData({ data: rasters[0], width: readW, height: readH });
+            await processGeoTiffData({ data: rasters[0], width: readW, height: readH });
         }
         
         document.getElementById('stat-display').innerText = `Res: ${readW}x${readH} | Ratio: ${currentAspect.toFixed(2)}`;
@@ -2385,7 +2424,7 @@
         }
         applyAutoHeightScale(1.5);
 
-        buildTerrain(outputData, targetWidth, targetHeight);
+        await buildTerrain(outputData, targetWidth, targetHeight);
         loader.style.display = 'none';
     }
 
@@ -2409,7 +2448,7 @@
         isChunkLoading = false;
     }
 
-    function rebuildAllChunkMeshes() {
+    async function rebuildAllChunkMeshes() {
         if (!chunkGrid) return;
         
         // Save current chunk data
@@ -2434,7 +2473,7 @@
         
         // Rebuild meshes instantly from cached heightData
         for (const chunk of chunksData) {
-            const result = buildChunkMesh(chunk.heightData, chunk.readW, chunk.readH, chunk.cx, chunk.cy);
+            const result = await buildChunkMesh(chunk.heightData, chunk.readW, chunk.readH, chunk.cx, chunk.cy);
             chunk.meshes = result.meshes;
             chunk.processedH = result.processedH;
         }
@@ -2604,9 +2643,8 @@
 
         const srcX = cx * chunkPixelsX;
         const srcY = cy * chunkPixelsY;
-        // Overlap by 1 source pixel to seamlessly connect chunks without gaps
-        const srcW = Math.min(chunkPixelsX + 1, sourceW - srcX);
-        const srcH = Math.min(chunkPixelsY + 1, sourceH - srcY);
+        const srcW = Math.min(chunkPixelsX, sourceW - srcX);
+        const srcH = Math.min(chunkPixelsY, sourceH - srcY);
 
         // Determine the read resolution for this chunk
         let readW, readH;
@@ -2652,7 +2690,7 @@
             sanitizeNormalizedHeights(heightData);
 
             // Build mesh for this chunk
-            const { meshes, processedH } = buildChunkMesh(heightData, readW, readH, cx, cy);
+            const { meshes, processedH } = await buildChunkMesh(heightData, readW, readH, cx, cy);
 
             loadedChunks.set(key, {
                 meshes,
@@ -2679,12 +2717,12 @@
         }
     }
 
-    function buildChunkMesh(heights, width, height, cx, cy) {
+    async function buildChunkMesh(heights, width, height, cx, cy) {
         const { chunksX, chunksY } = chunkGrid;
         const bounds = getChunkWorldBounds(cx, cy);
 
         const isSmooth = document.getElementById('btn-smooth').checked;
-        const processedH = isSmooth ? smoothHeights(heights, width, height) : heights;
+        const processedH = isSmooth ? await smoothHeights(heights, width, height) : heights;
         sanitizeNormalizedHeights(processedH);
 
         const style = document.getElementById('texture-style').value;
@@ -2710,6 +2748,7 @@
 
         for (let gy = 0; gy < gChunksY; gy++) {
             for (let gx = 0; gx < gChunksX; gx++) {
+                if (gx % 2 === 0) await new Promise(r => setTimeout(r, 0));
                 const startX = gx * maxChunkVerts;
                 const startY = gy * maxChunkVerts;
                 const currentSegX = Math.min(maxChunkVerts, segX - startX);
@@ -2768,8 +2807,8 @@
                         normals[localIdx * 3 + 2] = -dHdz / len;
 
                         const dataIdx = Math.min(globalY, height - 1) * width + Math.min(globalX, width - 1);
-                        const normH = processedH[dataIdx];
-
+                        const normH = processedH[dataIdx] || 0; // Handle potentially undefined output
+                        
                         if (normH < 0) {
                             colors.push(0, 0, 0, 0);
                         } else {
@@ -2818,6 +2857,7 @@
                 terrainGroup.add(mesh);
                 meshes.push(mesh);
             }
+            await new Promise(r => setTimeout(r, 0));
         }
 
         return { meshes, processedH };
@@ -3277,7 +3317,7 @@
         activeSatelliteTexture.colorSpace = THREE.SRGBColorSpace;
     }
 
-    function processGeoTiffData(tiffData) {
+    async function processGeoTiffData(tiffData) {
         const { data, width, height } = tiffData;
         const size = width * height;
         const sampledHeights = new Float32Array(size);
@@ -3304,7 +3344,7 @@
         }
         applyAutoHeightScale(1.5);
 
-        buildTerrain(sampledHeights, width, height);
+        await buildTerrain(sampledHeights, width, height);
         alignPlayerToTerrain(true);
         if (typeof document !== 'undefined') {
             const loader = document.getElementById('loading-indicator');
