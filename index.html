@@ -596,7 +596,7 @@
 </div>
 
 <div id="ui-layer">
-    <h1>Terrain Engine V5.0</h1>
+    <h1>3D DEM Explorer V1.0</h1>
     
     <div class="control-group">
         <label>1. Detail Level</label>
@@ -933,7 +933,7 @@
         avc:  ['avc1.640034', 'avc1.640033', 'avc1.4D4034', 'avc1.4D4033', 'avc1.4D002A', 'avc1.640032']
     };
     const REEL_SUPERSAMPLE = 2; // render at 2x and downscale for PNG-grade sharpness
-    const PNG_EXPORT_LONG_EDGE = 3840;
+    const PNG_EXPORT_LONG_EDGE = 7680; // 8K resolution for maximum sharpness
     const PNG_EXPORT_SUPERSAMPLE = 2;
     const PNG_EXPORT_DPI = 300;
     let isPngExporting = false;
@@ -1791,29 +1791,18 @@
                 outputH = Math.max(1, Math.floor(outputH * scale));
             }
 
-            let supersample = (CHUNK_RES >= 4096) ? 1 : Math.min(PNG_EXPORT_SUPERSAMPLE, maxEdge / Math.max(outputW, outputH));
-            if (!Number.isFinite(supersample) || supersample < 1) supersample = 1;
-
-            const renderW = Math.max(1, Math.floor(outputW * supersample));
-            const renderH = Math.max(1, Math.floor(outputH * supersample));
-
             camera.aspect = outputW / outputH;
             camera.updateProjectionMatrix();
 
+            // Render directly at native 4K (1:1 pixel mapping).
+            // This avoids Canvas 2D bilinear downscaling which causes image softening,
+            // resulting in perfectly crisp native WebGL texture sampling.
             renderer.setPixelRatio(1);
-            renderer.setSize(renderW, renderH, false);
+            renderer.setSize(outputW, outputH, false);
             renderer.render(scene, camera);
 
-            const outputCanvas = document.createElement('canvas');
-            outputCanvas.width = outputW;
-            outputCanvas.height = outputH;
-            const outputCtx = outputCanvas.getContext('2d', { alpha: false });
-            if (!outputCtx) throw new Error('Could not create export context.');
-            outputCtx.imageSmoothingEnabled = true;
-            outputCtx.imageSmoothingQuality = 'high';
-            outputCtx.drawImage(renderer.domElement, 0, 0, outputW, outputH);
-
-            const pngBlob = await new Promise((resolve) => outputCanvas.toBlob(resolve, 'image/png'));
+            // Export directly from the WebGL canvas
+            const pngBlob = await new Promise((resolve) => renderer.domElement.toBlob(resolve, 'image/png'));
             if (!pngBlob) throw new Error('Browser could not encode PNG.');
             const dpiPngBlob = await withPngDpiMetadata(pngBlob, PNG_EXPORT_DPI);
 
@@ -3393,6 +3382,9 @@
         if (activeSatelliteTexture) activeSatelliteTexture.dispose();
         activeSatelliteTexture = new THREE.CanvasTexture(cropCanvas);
         activeSatelliteTexture.colorSpace = THREE.SRGBColorSpace;
+        if (renderer && renderer.capabilities) {
+            activeSatelliteTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        }
     }
 
     async function processGeoTiffData(tiffData) {
