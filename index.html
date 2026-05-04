@@ -1920,7 +1920,7 @@
                 if (normH >= stops[i].h && normH <= stops[i + 1].h) {
                     const range = stops[i + 1].h - stops[i].h;
                     const t = range > 0 ? (normH - stops[i].h) / range : 0;
-                    color.set(stops[i].c).lerpHSL(new THREE.Color(stops[i + 1].c), t);
+                    color.set(stops[i].c).lerp(new THREE.Color(stops[i + 1].c), t);
                     return;
                 }
             }
@@ -2646,6 +2646,83 @@
             }
         }
 
+        window.setRecordingMask = function (ratioStr) {
+            let mask = document.getElementById('dev-recording-mask');
+            if (!mask) {
+                mask = document.createElement('div');
+                mask.id = 'dev-recording-mask';
+                mask.style.position = 'fixed';
+                mask.style.top = '0';
+                mask.style.left = '0';
+                mask.style.right = '0';
+                mask.style.bottom = '0';
+                mask.style.margin = 'auto';
+                mask.style.pointerEvents = 'none';
+                mask.style.zIndex = '9999';
+                mask.style.border = '2px solid rgba(255,255,255,0.15)';
+                mask.style.boxShadow = '0 0 0 100vmax rgba(0,0,0,0.85)';
+                mask.style.transition = 'all 0.3s ease';
+                document.body.appendChild(mask);
+            }
+
+            if (ratioStr === 'youtube' || ratioStr === '16:9') {
+                mask.style.display = 'block';
+                mask.style.width = '100vw';
+                mask.style.height = '56.25vw';
+                mask.style.maxHeight = '100vh';
+                mask.style.maxWidth = '177.777vh';
+                console.log("Dev Recording Mask: YouTube 16:9");
+            } else if (ratioStr === 'instagram' || ratioStr === '9:16') {
+                mask.style.display = 'block';
+                mask.style.width = '100vw';
+                mask.style.height = '177.777vw';
+                mask.style.maxHeight = '100vh';
+                mask.style.maxWidth = '56.25vh';
+                console.log("Dev Recording Mask: Instagram 9:16");
+            } else {
+                mask.style.display = 'none';
+                console.log("Dev Recording Mask: OFF");
+            }
+        };
+
+        let liveRecorder = null;
+        let liveChunks = [];
+        window.toggleLiveRecord = async function () {
+            if (liveRecorder && liveRecorder.state !== 'inactive') {
+                liveRecorder.stop();
+                console.log("Stopped Dev Screen Recording.");
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'browser' }, audio: false });
+                liveChunks = [];
+                // HIGHER QUALITY: request 20 Mbps bitrate
+                liveRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 20000000 });
+                liveRecorder.ondataavailable = e => { if (e.data.size > 0) liveChunks.push(e.data); };
+                liveRecorder.onstop = () => {
+                    downloadSatelliteRights();
+                    const blob = new Blob(liveChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `DEM3D_Live_Recording_HQ_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+                    stream.getTracks().forEach(t => t.stop());
+                };
+                stream.getVideoTracks()[0].onended = () => {
+                    if (liveRecorder && liveRecorder.state !== 'inactive') liveRecorder.stop();
+                };
+                liveRecorder.start();
+                console.log("Started Dev Screen Recording (High Quality)...");
+            } catch (err) {
+                console.error("Screen recording failed:", err);
+                alert("Could not start screen recording.");
+            }
+        };
+
         function onKey(event, isDown) {
             switch (event.code) {
                 case 'ArrowUp': case 'KeyW': moveForward = isDown; break;
@@ -2664,6 +2741,10 @@
                 case 'KeyE': if (flightMode) moveUp = isDown; break;
                 case 'KeyF': if (isDown) toggleFlightMode(); break;
                 case 'KeyP': if (isDown && !event.repeat && !isTypingInField()) exportUltraPng(); break;
+                case 'KeyY': if (isDown && event.altKey && !isTypingInField()) window.setRecordingMask('youtube'); break;
+                case 'KeyI': if (isDown && event.altKey && !isTypingInField()) window.setRecordingMask('instagram'); break;
+                case 'KeyO': if (isDown && event.altKey && !isTypingInField()) window.setRecordingMask('off'); break;
+                case 'KeyR': if (isDown && event.altKey && !isTypingInField()) window.toggleLiveRecord(); break;
             }
         }
 
