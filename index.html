@@ -2687,6 +2687,11 @@
 
         let liveRecorder = null;
         let liveChunks = [];
+        let liveRecVideo = null;
+        let liveRecCanvas = null;
+        let liveRecCtx = null;
+        let liveRecInterval = null;
+
         window.toggleLiveRecord = async function () {
             if (liveRecorder && liveRecorder.state !== 'inactive') {
                 liveRecorder.stop();
@@ -2694,17 +2699,64 @@
                 return;
             }
             try {
-                const stream = await navigator.mediaDevices.getDisplayMedia({
+                const sourceStream = await navigator.mediaDevices.getDisplayMedia({
                     video: {
-                        displaySurface: 'browser',
-                        width: { ideal: 3840 },
-                        height: { ideal: 2160 }
+                        displaySurface: 'browser'
                     },
                     audio: false
                 });
+
+                liveRecVideo = document.createElement('video');
+                liveRecVideo.srcObject = sourceStream;
+                liveRecVideo.muted = true;
+                liveRecVideo.play();
+
+                await new Promise(resolve => {
+                    liveRecVideo.onloadedmetadata = () => resolve();
+                });
+
+                const videoW = liveRecVideo.videoWidth || 1920;
+                const videoH = liveRecVideo.videoHeight || 1080;
+                
+                // Scale so it's strictly >= 4K in both dimensions to ensure no quality loss when cropping
+                const scale = Math.max(3840 / videoW, 2160 / videoH);
+                const canvasW = Math.round(videoW * scale);
+                const canvasH = Math.round(videoH * scale);
+
+                liveRecCanvas = document.createElement('canvas');
+                liveRecCanvas.width = canvasW;
+                liveRecCanvas.height = canvasH;
+                liveRecCtx = liveRecCanvas.getContext('2d', { alpha: false });
+                liveRecCtx.imageSmoothingEnabled = true;
+                liveRecCtx.imageSmoothingQuality = 'high';
+
+                const drawLoop = () => {
+                    if (liveRecorder && liveRecorder.state !== 'inactive') {
+                        const curW = liveRecVideo.videoWidth;
+                        const curH = liveRecVideo.videoHeight;
+                        if (curW && curH) {
+                            const curScale = Math.max(3840 / curW, 2160 / curH);
+                            const curCanvasW = Math.round(curW * curScale);
+                            const curCanvasH = Math.round(curH * curScale);
+                            if (curCanvasW !== liveRecCanvas.width || curCanvasH !== liveRecCanvas.height) {
+                                liveRecCanvas.width = curCanvasW;
+                                liveRecCanvas.height = curCanvasH;
+                                liveRecCtx.imageSmoothingEnabled = true;
+                                liveRecCtx.imageSmoothingQuality = 'high';
+                            }
+                            liveRecCtx.drawImage(liveRecVideo, 0, 0, liveRecCanvas.width, liveRecCanvas.height);
+                        }
+                    }
+                };
+
+                // Use setInterval instead of requestAnimationFrame so it keeps recording if window loses focus
+                liveRecInterval = setInterval(drawLoop, 1000 / 60);
+
+                const canvasStream = liveRecCanvas.captureStream(60);
+
                 liveChunks = [];
                 // HIGHER QUALITY: request 50 Mbps bitrate for 4K
-                liveRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 50000000 });
+                liveRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 50000000 });
                 liveRecorder.ondataavailable = e => { if (e.data.size > 0) liveChunks.push(e.data); };
                 liveRecorder.onstop = () => {
                     downloadSatelliteRights();
@@ -2713,17 +2765,27 @@
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
-                    a.download = `DEM3D_Live_Recording_HQ_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.webm`;
+                    a.download = `DEM3D_Live_Recording_4K_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.webm`;
                     document.body.appendChild(a);
                     a.click();
                     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
-                    stream.getTracks().forEach(t => t.stop());
+                    
+                    sourceStream.getTracks().forEach(t => t.stop());
+                    canvasStream.getTracks().forEach(t => t.stop());
+                    clearInterval(liveRecInterval);
+                    liveRecVideo.pause();
+                    liveRecVideo.srcObject = null;
+                    liveRecVideo = null;
+                    liveRecCanvas = null;
+                    liveRecCtx = null;
                 };
-                stream.getVideoTracks()[0].onended = () => {
+
+                sourceStream.getVideoTracks()[0].onended = () => {
                     if (liveRecorder && liveRecorder.state !== 'inactive') liveRecorder.stop();
                 };
+
                 liveRecorder.start();
-                console.log("Started Dev Screen Recording (High Quality)...");
+                console.log(`Started Dev Screen Recording (Forced 4K: ${canvasW}x${canvasH})...`);
             } catch (err) {
                 console.error("Screen recording failed:", err);
                 alert("Could not start screen recording.");
