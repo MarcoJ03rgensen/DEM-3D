@@ -11,6 +11,9 @@ This project is a static web app. There is no build step or package manager depe
 
 The current app focuses on a fast single-page workflow: load a GeoTIFF, tune the terrain presentation, move through the scene, and export results directly from the browser.
 
+## Tutorial
+A tutorial will be available soon on @the_danish_archaeologist on youtube, instagram and tiktok.
+
 ## Features
 
 - Upload GeoTIFF files and visualize elevation data in 3D.
@@ -104,13 +107,14 @@ If you want to test the site locally with a server, a simple static server is en
 
 Recommended browsers are current Chromium-based browsers, since the app relies on modern browser APIs for 3D rendering and export features.
 
-## Deployment
+## Credits
 
-This repository is suitable for static hosting. Publish the contents of the repo as-is to any static file host or web server.
+In case you need to explain how your figures (videos, pictures, 3D models) were made you can cite this repo or:"DEM-3D Explorer V1.0, Marco Jørgensen (2026)"
 
 ## License
 
-Copyright (c) 2025 Marco Birkedahl Jorgensen
+Copyright (c) 2026 Marco Jørgensen
 
-Licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
+This work, DEM-3D Explorer V1.0, is licensed under the Creative Commons Attribution-NonCommercial 4.0 
+International License.
 
