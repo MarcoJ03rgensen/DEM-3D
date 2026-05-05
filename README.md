@@ -1,50 +1,31 @@
-# 3D DEM Explorer V5.0
+# 3D DEM Explorer V1.0
 
-A web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
+3D DEM Explorer is a browser-based Digital Elevation Model viewer for exploring GeoTIFF terrain data in interactive 3D.
 
-![Version](https://img.shields.io/badge/version-5.0-blue)
+![Version](https://img.shields.io/badge/version-1.0-blue)
 ![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-green)
 
-## 🌟 Features
+## Overview
 
-### Core Capabilities
-- **🗺️ GeoTIFF**: Upload and instantly visualize GeoTIFF (.tif/.tiff) elevation files
-- **🚀 Massive File Handling**: Process DEMs using intelligent tiled streaming
-- **🎨 Multiple Visualization Styles**:
-  - Grayscale (Raw Height - Default)
-  - Clay (Neutral)
-  - Heatmap (Detailed elevation gradient)
-  - Satellite Imagery (High-res overlay mapped perfectly to DEM bounds)
-- **🖼️ Configurable Environments**:
-  - Sky Blue
-  - Greenscreen (Chroma Key) - for recording and composite work
-  - Dark Mode
-  - Light Mode
-- **🎮 Dual Navigation Modes**:
-  - Ground mode with smoothed, collision-detected physics
-  - Flight mode for aerial exploration
-- **📐 Realistic Scaling**: Automatic 1:1 scale calculation from GeoTIFF metadata
-- **💾 Export Options**:
-  - **4K Reel Studio**: High-end cinematic video export (MP4)
-  - **3D Model**: (.glb format)
-  - **4K PNG**: High-fidelity static image export
-- **📱 Mobile V5 Overhaul**: Complete mobile-first redesign with touch-optimized settings drawer, quick-action toolbars (PNG/Upload/Reel shortcuts), and precision multi-touch navigation.
+This project is a static web app. There is no build step or package manager dependency; the site runs directly from the HTML, CSS, and browser-side JavaScript in this repository.
 
-### 🎬 4K Reel Studio (Pro Video Export)
-- **Multi-Format Support**: Switch between **9:16 Portrait** (Reels/TikTok) and **16:9 Landscape** (YouTube/Desktop).
-- **Ultra-Sharp Rendering**: Uses **2x Supersampling** to render frames at 8K internal resolution before downscaling, ensuring every frame matches the crispness of a high-end PNG export.
-- **Cinematic Motion Blur**: Accumulation-based rendering (up to 16 samples) for professional motion trails.
-- **High Bitrate**: 80 Mbps H.264 encoding for broadcast-quality output.
-- **Custom Watermarking**: Dynamic text overlay with automatic positioning.
+The current app focuses on a fast single-page workflow: load a GeoTIFF, tune the terrain presentation, move through the scene, and export results directly from the browser.
 
-### Technical Highlights
-- **Chunked Rendering**: Handles millions of polygons via a distributed geometry pipeline.
-- **Adaptive Precision Smoothing**: Dynamic kernel averaging based on active resolution.
-- **Smooth Terrain Collision**: Easing-based physics to absorb sharp elevation changes.
+## Features
 
-## 🎮 Controls
+- Upload GeoTIFF files and visualize elevation data in 3D.
+- Choose from grayscale, clay, heatmap, custom heatmap, and satellite imagery rendering.
+- Toggle between sky blue, greenscreen, dark mode, and light mode backgrounds.
+- Switch between ground mode and flight mode for different navigation styles.
+- Enable smooth terrain, realistic 1:1 scaling, and adjustable vertical exaggeration.
+- Stream large terrains in chunks so massive files remain usable in the browser.
+- Export terrain as a GLB model, a high-resolution PNG image, or a 4K Reel Studio video.
+- Use the mobile layout with touch controls, quick actions, and a slide-out settings drawer.
+
+## Controls
 
 ### Desktop
+
 | Action | Ground Mode | Flight Mode |
 |--------|-------------|-------------|
 | Move | `W` `A` `S` `D` | `W` `A` `S` `D` |
@@ -53,56 +34,83 @@ A web-based 3D Digital Elevation Model (DEM) viewer for terrain visualization.
 | Run / Descend | `Shift` | `Shift` or `Q` |
 | Toggle Flight | `F` | `F` |
 
+Other desktop controls in the UI include drag-and-drop style file upload through the GeoTIFF selector, the detail-level dropdown, and the export buttons in the side panel.
+
 ### Mobile
-- **Left Joystick**: Proportional movement (slide farther to sprint)
-- **Touch & Drag**: Precision look around (multi-touch separated from joystick)
-- **⚙️ Settings Button**: Slide-out configuration drawer
-- **📂 Quick Bar**: One-tap shortcuts for Upload, 4K PNG, and Reel Studio
-- **JUMP Button**: Jump (ground) / Ascend (flight)
-- **DOWN Button**: Descend (flight mode only)
-- **✈️ Flight Button**: Instant flight mode toggle with visual status
 
-## 📊 Detail Levels
+- Left joystick for movement, with stronger input producing faster travel.
+- Touch-and-drag for looking around without conflicting with movement.
+- Settings button for showing or hiding the control drawer.
+- Quick actions for upload, PNG export, and Reel Studio export.
+- Separate jump and down buttons for ground and flight movement.
 
-| Level | Resolution | Polygons | Best For |
-|-------|-----------|----------|----------|
-| Standard | 1024×1024 | ~1M | Balanced performance, default |
-| High | 2048×2048 | ~4M | Detailed visualization |
-| Very High | 4096×4096 | ~16M | High-end systems |
-| Extreme | 8192×8192 | ~64M | Workstation GPUs |
-| Extreme+ | 11585×11585 | ~128M | Maximum detail |
+## Detail Levels
 
-## 🛠️ Technical Architecture
+| Level | Resolution | Approx. Polygons | Best For |
+|-------|------------|------------------|----------|
+| Standard | 1024x1024 | 1M | Balanced performance |
+| High | 2048x2048 | 4M | More terrain detail |
+| Very High | 4096x4096 | 16M | High-end devices |
+| Ultra High | 5793x5793 | 32M | Heavier terrain scenes |
+| Extreme | 8192x8192 | 64M | Workstation GPUs |
+| Extreme+ | 11585x11585 | 128M | Maximum detail |
 
-### 📹 Video Encoding (WebCodecs)
-The engine utilizes the **WebCodecs API** and **Mp4Muxer.js** for hardware-accelerated H.264 encoding directly in the browser. It bypasses standard canvas capture limitations to produce high-bitrate files that are compatible with professional editing software.
+You can also choose Custom and enter a target polygon count manually.
 
-### Memory Management
-- **Direct Resampling**: Optimized array-driven reading.
-- **Tiled Streaming**: Progressive loading for massive files to prevent browser freezing.
+## Rendering
 
-## 📁 File Format Support
+The rendering controls expose the options used by the app shell:
 
-### Input Formats
-- **GeoTIFF** (.tif, .tiff): Extracts pixel scales, real-world dimensions, and geographic elevations.
+- Color Style: grayscale, clay, heatmap, custom heatmap, or satellite imagery.
+- Background Environment: sky blue, greenscreen, dark mode, or light mode.
+- Smooth Terrain: reduces harsh surface changes.
+- Vertical Exaggeration: increases or reduces terrain relief.
+- Realistic Scale: applies a 1:1 scale derived from file metadata when available.
+- Chunk Streaming: lets you stream nearby chunks only or load the full DEM chunk set.
+- Off-screen Chunk Hiding: reduces clutter when working with large terrains.
 
-### Output Formats
-- **MP4 Videos**: Cinematic 4K exports in 9:16 or 16:9 with supersampling.
-- **GLB**: 3D terrain mesh export.
-- **PNG**: High-quality 4K screenshots.
+## File Support
 
-## 📄 License
+### Input
 
-Copyright (c) 2025 Marco Birkedahl Jørgensen
-Licensed under the **Creative Commons Attribution-NonCommercial 4.0 International License**.
+- GeoTIFF files: `.tif`, `.tiff`
 
----
+The app uses the file metadata and pixel data to estimate scale, shape, and elevation values.
 
-**Version History:**
-- **v5.0 (2025)**: **Next-Gen Mobile Overhaul**. Added touch-optimized quick bars, settings drawer, multi-touch precision look, proportional joystick movement, and mobile-friendly cinema mode.
-- **v4.6**: Added 16:9 Landscape support, 2x Supersampled Video Rendering, and Motion Blur.
-- **v4.5**: Added flight mode, heatmap visualization, and massive DEM support.
-- **v4.0**: GeoTIFF export and realistic scaling.
-- **v3.0**: Chunked rendering for high-resolution terrains.
-- **v2.0**: GeoTIFF support with metadata parsing.
-- **v1.0**: Initial release.
+### Output
+
+- PNG screenshots at high resolution
+- MP4 videos from Reel Studio
+- GLB terrain meshes for 3D workflows
+
+## Reel Studio
+
+Reel Studio is the app's video export workflow. It is designed for cinematic captures and supports portrait or landscape framing, higher-quality supersampling, and configurable encoding settings.
+
+Key behaviors in the current app include:
+
+- 9:16 portrait and 16:9 landscape output.
+- H.264-compatible export mode and a higher-bitrate H.265 master mode.
+- Supersampling where the GPU budget allows it.
+- A watermark overlay for exported reels.
+
+## Local Use
+
+1. Open `index.html` in a modern browser, or serve the folder with any static web server.
+2. Upload a GeoTIFF file from the app UI.
+3. Adjust visualization, movement mode, and export settings as needed.
+
+If you want to test the site locally with a server, a simple static server is enough because the project does not require a build step.
+
+Recommended browsers are current Chromium-based browsers, since the app relies on modern browser APIs for 3D rendering and export features.
+
+## Deployment
+
+This repository is suitable for static hosting. Publish the contents of the repo as-is to any static file host or web server.
+
+## License
+
+Copyright (c) 2025 Marco Birkedahl Jorgensen
+
+Licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
+
