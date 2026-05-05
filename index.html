@@ -2718,10 +2718,9 @@
                 const videoW = liveRecVideo.videoWidth || 1920;
                 const videoH = liveRecVideo.videoHeight || 1080;
                 
-                // Scale so it's strictly >= 4K in both dimensions to ensure no quality loss when cropping
-                const scale = Math.max(3840 / videoW, 2160 / videoH);
-                const canvasW = Math.round(videoW * scale);
-                const canvasH = Math.round(videoH * scale);
+                // Use video dimensions directly (no upscaling) to reduce memory overhead
+                const canvasW = videoW;
+                const canvasH = videoH;
 
                 liveRecCanvas = document.createElement('canvas');
                 liveRecCanvas.width = canvasW;
@@ -2735,15 +2734,6 @@
                         const curW = liveRecVideo.videoWidth;
                         const curH = liveRecVideo.videoHeight;
                         if (curW && curH) {
-                            const curScale = Math.max(3840 / curW, 2160 / curH);
-                            const curCanvasW = Math.round(curW * curScale);
-                            const curCanvasH = Math.round(curH * curScale);
-                            if (curCanvasW !== liveRecCanvas.width || curCanvasH !== liveRecCanvas.height) {
-                                liveRecCanvas.width = curCanvasW;
-                                liveRecCanvas.height = curCanvasH;
-                                liveRecCtx.imageSmoothingEnabled = true;
-                                liveRecCtx.imageSmoothingQuality = 'high';
-                            }
                             liveRecCtx.drawImage(liveRecVideo, 0, 0, liveRecCanvas.width, liveRecCanvas.height);
                         }
                     }
@@ -2755,8 +2745,22 @@
                 const canvasStream = liveRecCanvas.captureStream(60);
 
                 liveChunks = [];
-                // HIGHER QUALITY: request 50 Mbps bitrate for 4K
-                liveRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 50000000 });
+                // Use H.264 for better hardware acceleration and reduced lag; 12 Mbps for reasonable quality/performance balance
+                const recOptions = { videoBitsPerSecond: 12000000 };
+                // Try H.264 first (better HW support), fall back to VP9 if unavailable
+                try {
+                    if (MediaRecorder.isTypeSupported('video/mp4;codecs=h264')) {
+                        recOptions.mimeType = 'video/mp4;codecs=h264';
+                    } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
+                        recOptions.mimeType = 'video/webm;codecs=h264';
+                    } else {
+                        recOptions.mimeType = 'video/webm;codecs=vp9';
+                    }
+                } catch (e) {
+                    console.log('Codec check failed, using default:', e);
+                }
+                liveRecorder = new MediaRecorder(canvasStream, recOptions);
+                // Use timeslices to flush chunks periodically instead of accumulating all in memory
                 liveRecorder.ondataavailable = e => { if (e.data.size > 0) liveChunks.push(e.data); };
                 liveRecorder.onstop = () => {
                     downloadSatelliteRights();
@@ -2784,8 +2788,9 @@
                     if (liveRecorder && liveRecorder.state !== 'inactive') liveRecorder.stop();
                 };
 
-                liveRecorder.start();
-                console.log(`Started Dev Screen Recording (Forced 4K: ${canvasW}x${canvasH})...`);
+                // Request chunks every 1 second to flush memory periodically
+                liveRecorder.start(1000);
+                console.log(`Started Dev Screen Recording (${canvasW}x${canvasH}, 12 Mbps, periodic flush)...`);
             } catch (err) {
                 console.error("Screen recording failed:", err);
                 alert("Could not start screen recording.");
