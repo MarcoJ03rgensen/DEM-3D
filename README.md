@@ -4,26 +4,28 @@
 
 ![Version](https://img.shields.io/badge/version-1.0-blue)
 ![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-green)
+![Platform](https://img.shields.io/badge/platform-browser-informational)
 
-## Overview
+## At a Glance
 
-This project is a static web app. There is no build step or package manager dependency; the site runs directly from the HTML, CSS, and browser-side JavaScript in this repository.
+| What it is | How it runs | Main outputs |
+|------------|-------------|--------------|
+| Interactive GeoTIFF terrain viewer | Static web app, no build step | PNG, MP4, GLB |
 
-The current app focuses on a fast single-page workflow: load a GeoTIFF, tune the terrain presentation, move through the scene, and export results directly from the browser.
+This project runs directly from the HTML, CSS, and browser-side JavaScript in this repository. The workflow is intentionally simple: load a GeoTIFF, adjust the terrain presentation, move through the scene, and export results from the browser.
 
-## Tutorial
-A tutorial will be available soon on @the_danish_archaeologist on youtube, instagram and tiktok.
+> Tutorial content will be published soon on @the_danish_archaeologist on YouTube, Instagram, and TikTok.
 
-## Features
+## Highlights
 
-- Upload GeoTIFF files and visualize elevation data in 3D.
-- Choose from grayscale, clay, heatmap, custom heatmap, and satellite imagery rendering.
-- Toggle between sky blue, greenscreen, dark mode, and light mode backgrounds.
-- Switch between ground mode and flight mode for different navigation styles.
-- Enable smooth terrain, realistic 1:1 scaling, and adjustable vertical exaggeration.
-- Stream large terrains in chunks so massive files remain usable in the browser.
-- Export terrain as a GLB model, a high-resolution PNG image, or a 4K Reel Studio video.
-- Use the mobile layout with touch controls, quick actions, and a slide-out settings drawer.
+- View GeoTIFF elevation data in 3D.
+- Switch between grayscale, clay, heatmap, custom heatmap, and satellite imagery.
+- Use sky blue, greenscreen, dark mode, or light mode environments.
+- Move in ground mode or flight mode.
+- Apply smooth terrain, realistic 1:1 scaling, and vertical exaggeration.
+- Stream large terrains in chunks to keep massive files usable.
+- Export high-resolution PNGs, GLB terrain models, or 4K Reel Studio videos.
+- Use mobile-friendly touch controls and a slide-out settings drawer.
 
 ## Controls
 
@@ -37,7 +39,7 @@ A tutorial will be available soon on @the_danish_archaeologist on youtube, insta
 | Run / Descend | `Shift` | `Shift` or `Q` |
 | Toggle Flight | `F` | `F` |
 
-Other desktop controls in the UI include drag-and-drop style file upload through the GeoTIFF selector, the detail-level dropdown, and the export buttons in the side panel.
+Other desktop controls include the GeoTIFF file selector, detail-level dropdown, and export buttons in the side panel.
 
 ### Mobile
 
@@ -58,18 +60,18 @@ Other desktop controls in the UI include drag-and-drop style file upload through
 | Extreme | 8192x8192 | 64M | Workstation GPUs |
 | Extreme+ | 11585x11585 | 128M | Maximum detail |
 
-You can also choose Custom and enter a target polygon count manually.
+Custom mode is also available if you want to enter a target polygon count manually.
 
-## Rendering
+## Rendering Options
 
-The rendering controls expose the options used by the app shell:
+The app shell exposes the following presentation controls:
 
 - Color Style: grayscale, clay, heatmap, custom heatmap, or satellite imagery.
 - Background Environment: sky blue, greenscreen, dark mode, or light mode.
-- Smooth Terrain: reduces harsh surface changes.
+- Smooth Terrain: softens harsh surface changes.
 - Vertical Exaggeration: increases or reduces terrain relief.
 - Realistic Scale: applies a 1:1 scale derived from file metadata when available.
-- Chunk Streaming: lets you stream nearby chunks only or load the full DEM chunk set.
+- Chunk Streaming: stream nearby chunks only or load the full DEM chunk set.
 - Off-screen Chunk Hiding: reduces clutter when working with large terrains.
 
 ## File Support
@@ -78,7 +80,7 @@ The rendering controls expose the options used by the app shell:
 
 - GeoTIFF files: `.tif`, `.tiff`
 
-The app uses the file metadata and pixel data to estimate scale, shape, and elevation values.
+The app uses file metadata and pixel data to estimate scale, shape, and elevation values.
 
 ### Output
 
@@ -88,9 +90,9 @@ The app uses the file metadata and pixel data to estimate scale, shape, and elev
 
 ## Reel Studio
 
-Reel Studio is the app's video export workflow. It is designed for cinematic captures and supports portrait or landscape framing, higher-quality supersampling, and configurable encoding settings.
+Reel Studio is the cinematic export workflow built into the app. It supports portrait or landscape framing, higher-quality supersampling, and configurable encoding settings.
 
-Key behaviors in the current app include:
+Key behaviors include:
 
 - 9:16 portrait and 16:9 landscape output.
 - H.264-compatible export mode and a higher-bitrate H.265 master mode.
@@ -103,18 +105,15 @@ Key behaviors in the current app include:
 2. Upload a GeoTIFF file from the app UI.
 3. Adjust visualization, movement mode, and export settings as needed.
 
-If you want to test the site locally with a server, a simple static server is enough because the project does not require a build step.
-
 Recommended browsers are current Chromium-based browsers, since the app relies on modern browser APIs for 3D rendering and export features.
 
 ## Credits
 
-In case you need to explain how your figures (videos, pictures, 3D models) were made you can cite this repo or:"DEM-3D Explorer V1.0, Marco Jørgensen (2026)"
+If you need to describe how figures, videos, pictures, or 3D models were made, you can cite this repository or use: `DEM-3D Explorer V1.0, Marco Jørgensen (2026)`.
 
 ## License
 
 Copyright (c) 2026 Marco Jørgensen
 
-This work, DEM-3D Explorer V1.0, is licensed under the Creative Commons Attribution-NonCommercial 4.0 
-International License.
+This work, DEM-3D Explorer V1.0, is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
 
