@@ -628,7 +628,7 @@
             transition: width 0.3s;
         }
 
-        /* ===== CINEMA / 4K REEL MODE ===== */
+        /* ===== CINEMA / 4K Video MODE ===== */
         #cinema-panel {
             position: absolute;
             top: 10px;
@@ -1062,7 +1062,7 @@
         <div class="control-group">
             <label>4. Exports</label>
             <button id="btn-export" class="btn btn-green">💾 3D Model (.glb)</button>
-            <button id="btn-open-cinema" class="btn btn-instagram" style="margin-top:6px;">🎬 4K Reel Studio</button>
+            <button id="btn-open-cinema" class="btn btn-instagram" style="margin-top:6px;">🎬 4K Video Studio</button>
         </div>
 
     </div>
@@ -1070,7 +1070,7 @@
     <!-- ===== CINEMA MODE PANEL ===== -->
     <div id="cinema-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h2 style="margin:0;">🎬 4K Reel Studio <span id="cinema-format-badge"
+            <h2 style="margin:0;">🎬 4K Video Studio <span id="cinema-format-badge"
                     style="font-size:0.7rem;opacity:0.45;font-weight:normal;">9:16 Portrait</span></h2>
             <button id="btn-toggle-cinema" class="btn btn-outline"
                 style="width:auto; margin:0; padding:4px 10px; font-size:0.75rem;">Hide</button>
@@ -1155,7 +1155,7 @@
             </div>
 
             <div class="cp-section">
-                <button id="btn-render-reel" class="btn btn-instagram" disabled>🎬 Export 4K Reel (MP4)</button>
+                <button id="btn-render-reel" class="btn btn-instagram" disabled>🎬 Export 4K Video (MP4)</button>
                 <div id="cp-export-specs" style="font-size:0.68rem;color:#888;margin-top:5px;text-align:center;">2160 ×
                     3840 · 30 fps · 35 Mbps (H.264 Compatible)</div>
             </div>
@@ -4579,7 +4579,7 @@
             document.getElementById('cinema-frame-overlay').style.display = 'flex';
             document.getElementById('cinema-click-hint').style.display = 'flex';
             document.getElementById('cinema-nav-hint').style.display = 'none';
-            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'block';
             document.getElementById('minimap-container').style.display = 'none';
             document.getElementById('blocker').style.display = 'none';
             // Hide mobile UI elements

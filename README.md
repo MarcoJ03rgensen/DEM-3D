@@ -24,7 +24,7 @@ This project runs directly from the HTML, CSS, and browser-side JavaScript in th
 - Move in ground mode or flight mode.
 - Apply smooth terrain, realistic 1:1 scaling, and vertical exaggeration.
 - Stream large terrains in chunks to keep massive files usable.
-- Export high-resolution PNGs, GLB terrain models, or 4K Reel Studio videos.
+- Export high-resolution PNGs, GLB terrain models, or 4K Video Studio videos.
 - Use mobile-friendly touch controls and a slide-out settings drawer.
 
 ## Controls
@@ -46,7 +46,7 @@ Other desktop controls include the GeoTIFF file selector, detail-level dropdown,
 - Left joystick for movement, with stronger input producing faster travel.
 - Touch-and-drag for looking around without conflicting with movement.
 - Settings button for showing or hiding the control drawer.
-- Quick actions for upload, PNG export, and Reel Studio export.
+- Quick actions for upload, PNG export, and Video Studio export.
 - Separate jump and down buttons for ground and flight movement.
 
 ## Detail Levels
@@ -85,19 +85,19 @@ The app uses file metadata and pixel data to estimate scale, shape, and elevatio
 ### Output
 
 - PNG screenshots at high resolution
-- MP4 videos from Reel Studio
+- MP4 videos from Video Studio
 - GLB terrain meshes for 3D workflows
 
-## Reel Studio
+## Video Studio
 
-Reel Studio is the cinematic export workflow built into the app. It supports portrait or landscape framing, higher-quality supersampling, and configurable encoding settings.
+Video Studio is the cinematic export workflow built into the app. It supports portrait or landscape framing, higher-quality supersampling, and configurable encoding settings.
 
 Key behaviors include:
 
 - 9:16 portrait and 16:9 landscape output.
 - H.264-compatible export mode and a higher-bitrate H.265 master mode.
 - Supersampling where the GPU budget allows it.
-- A watermark overlay for exported reels.
+- A personal watermark overlay for exported videos (if needed)
 
 ## Local Use
 
