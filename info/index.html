@@ -384,9 +384,27 @@
         }
 
         .glass-card:hover {
-            transform: translateY(-10px) scale(1.02);
-            border-color: var(--glass-border-bright);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            transform: translateY(-12px) scale(1.02);
+            border-color: var(--accent-blue);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), 0 0 20px rgba(74, 144, 226, 0.2);
+        }
+
+        .step-number {
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            font-size: 8rem;
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.03);
+            pointer-events: none;
+            line-height: 1;
+            font-family: 'Outfit', sans-serif;
+            transition: all 0.5s ease;
+        }
+
+        .glass-card:hover .step-number {
+            color: rgba(74, 144, 226, 0.08);
+            transform: scale(1.1) translateX(-10px);
         }
 
         .glass-card:hover .icon-box {
@@ -411,16 +429,21 @@
         }
 
         .glass-card h3 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-bottom: 0.8rem;
             letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .glass-card p {
             color: var(--text-secondary);
-            font-size: 1rem;
-            line-height: 1.7;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            font-weight: 500;
+            letter-spacing: 0.2px;
         }
 
         /* Controls Section */
@@ -624,31 +647,35 @@
             <h2>The Workflow</h2>
             <div class="grid">
                 <div class="glass-card">
+                    <div class="step-number">01</div>
                     <div class="icon-box">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                     </div>
-                    <h3>01. Upload</h3>
+                    <h3>Upload</h3>
                     <p>GeoTIFF Import · Drag & Drop · Spatial Chunking (demo)</p>
                 </div>
                 <div class="glass-card">
+                    <div class="step-number">02</div>
                     <div class="icon-box">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
                     </div>
-                    <h3>02. Explore</h3>
+                    <h3>Explore</h3>
                     <p>First-Person Navigation · Flight Mode · Collision Physics · Real-time Rendering</p>
                 </div>
                 <div class="glass-card">
+                    <div class="step-number">03</div>
                     <div class="icon-box">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
                     </div>
-                    <h3>03. Design</h3>
+                    <h3>Design</h3>
                     <p>Vertical Exaggeration · Satellite Imagery · Clay & Shadow · Dynamic Heatmaps · Custom Color Ramps · Terrain Smoothing</p>
                 </div>
                 <div class="glass-card">
+                    <div class="step-number">04</div>
                     <div class="icon-box">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                     </div>
-                    <h3>04. Export</h3>
+                    <h3>Export</h3>
                     <p>4K Video Studio · 8K PNG Snapshots · GLB 3D Models</p>
                 </div>
             </div>
