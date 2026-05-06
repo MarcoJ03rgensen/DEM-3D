@@ -20,6 +20,10 @@
     <link rel="manifest" href="/favicons/site.webmanifest">
     <meta name="theme-color" content="#0b0f14">
 
+    <!-- Preload Critical Assets -->
+    <link rel="preload" as="image" href="DEM3D_4K_PNG_7680x3950_300DPI_2026-05-05T16-32-24.png">
+    <link rel="preload" as="image" href="DEM3D_4K_PNG_7680x3950_300DPI_2026-05-05T16-35-34.png">
+    
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="3D DEM Explorer | Documentation & Examples">
@@ -589,7 +593,7 @@
             <p>Elevate your geospatial data with professional 3D visualization. Learn how to transform raw GeoTIFFs into cinematic experiences.</p>
             <div class="hero-btns">
                 <a href="/" class="launch-btn" style="padding: 0.8rem 2rem; font-size: 1rem;">Launch Web Explorer</a>
-                <a href="#" class="download-btn">
+                <a href="#" class="download-btn" id="info-download-btn" style="display: none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                     Download Desktop App
                 </a>
@@ -787,6 +791,8 @@
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
+            // Show the button only if the app is installable
+            if (downloadBtn) downloadBtn.style.display = 'flex';
         });
 
         // Register Service Worker
@@ -801,32 +807,41 @@
         }
 
         // Download App handler
-        const downloadBtn = document.querySelector('.download-btn');
+        const downloadBtn = document.getElementById('info-download-btn');
         
         const checkInstallation = () => {
             if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
-                if (downloadBtn) downloadBtn.style.display = 'none';
+                if (downloadBtn) downloadBtn.remove();
             }
         };
 
         window.addEventListener('appinstalled', () => {
-            if (downloadBtn) downloadBtn.style.display = 'none';
+            if (downloadBtn) downloadBtn.remove();
             deferredPrompt = null;
+        });
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Show the button only if the app is installable
+            if (downloadBtn) downloadBtn.style.display = 'flex';
         });
 
         checkInstallation();
 
-        downloadBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                console.log(`User response: ${outcome}`);
-                deferredPrompt = null;
-            } else {
-                alert("The 'Install' option is already available in your browser's address bar or menu. \n\nIf you have already installed the app, check your desktop or application list!");
-            }
-        });
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log(`User response: ${outcome}`);
+                    deferredPrompt = null;
+                } else {
+                    alert("The 'Install' option is already available in your browser's address bar or menu. \n\nIf you have already installed the app, check your desktop or application list!");
+                }
+            });
+        }
     </script>
 </body>
 
