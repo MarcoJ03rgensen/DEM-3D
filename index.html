@@ -5650,7 +5650,22 @@
         }
 
         // Download App handler
-        document.getElementById('btn-download-app').addEventListener('click', async () => {
+        const downloadBtn = document.getElementById('btn-download-app');
+        
+        const checkInstallation = () => {
+            if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+                if (downloadBtn) downloadBtn.style.display = 'none';
+            }
+        };
+
+        window.addEventListener('appinstalled', () => {
+            if (downloadBtn) downloadBtn.style.display = 'none';
+            deferredPrompt = null;
+        });
+
+        checkInstallation();
+
+        downloadBtn.addEventListener('click', async () => {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
