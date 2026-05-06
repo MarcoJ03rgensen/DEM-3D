@@ -48,7 +48,7 @@
 
     <!-- Preload Critical Assets -->
     <link rel="preload" as="image" href="favicons/apple-touch-icon.png">
-    
+
     <style>
         body {
             margin: 0;
@@ -1052,10 +1052,15 @@
     </div>
 
     <div id="ui-layer">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
-            <img src="/favicons/favicon-32x32.png" style="width: 24px; height: 24px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">
+        <div
+            style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+            <img src="/favicons/favicon-32x32.png"
+                style="width: 24px; height: 24px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">
             <h1 style="margin: 0; font-size: 1rem; flex: 1;">3D DEM Explorer V1.0</h1>
-            <a href="/info" style="color: #4a90e2; font-size: 0.7rem; text-decoration: none; border: 1px solid rgba(74, 144, 226, 0.4); padding: 3px 8px; border-radius: 5px; background: rgba(74, 144, 226, 0.1); transition: all 0.2s; white-space: nowrap;" onmouseover="this.style.background='rgba(74, 144, 226, 0.2)'; this.style.borderColor='#4a90e2';" onmouseout="this.style.background='rgba(74, 144, 226, 0.1)'; this.style.borderColor='rgba(74, 144, 226, 0.4)';">Info</a>
+            <a href="/info"
+                style="color: #4a90e2; font-size: 0.7rem; text-decoration: none; border: 1px solid rgba(74, 144, 226, 0.4); padding: 3px 8px; border-radius: 5px; background: rgba(74, 144, 226, 0.1); transition: all 0.2s; white-space: nowrap;"
+                onmouseover="this.style.background='rgba(74, 144, 226, 0.2)'; this.style.borderColor='#4a90e2';"
+                onmouseout="this.style.background='rgba(74, 144, 226, 0.1)'; this.style.borderColor='rgba(74, 144, 226, 0.4)';">Info</a>
         </div>
 
 
@@ -1147,15 +1152,25 @@
             <label>4. Exports</label>
             <button id="btn-export" class="btn btn-green">💾 3D Model (.glb)</button>
             <button id="btn-open-cinema" class="btn btn-instagram" style="margin-top:6px;">🎬 4K Video Studio</button>
-            <button id="btn-download-app" class="btn btn-secondary" style="margin-top:6px; background: rgba(255,255,255,0.1); display: none; align-items: center; justify-content: center; gap: 8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <button id="btn-download-app" class="btn btn-secondary"
+                style="margin-top:6px; background: rgba(255,255,255,0.1); display: none; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
                 Desktop App
             </button>
         </div>
-        
-        <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 10px; font-size: 0.7rem; color: #888; text-align: center;">
-            Developed by <a href="https://marcojorgensen.com" target="_blank" style="color: #4a90e2; text-decoration: none; font-weight: 600;">Marco Jørgensen</a><br>
-            <span style="opacity: 0.6; margin-top: 4px; display: block;">License: <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" style="color: #888; text-decoration: underline;">CC BY-NC 4.0</a></span>
+
+        <div
+            style="margin-top: 20px; border-top: 1px solid #333; padding-top: 10px; font-size: 0.7rem; color: #888; text-align: center;">
+            Developed by <a href="https://marcojorgensen.com" target="_blank"
+                style="color: #4a90e2; text-decoration: none; font-weight: 600;">Marco Jørgensen</a><br>
+            <span style="opacity: 0.6; margin-top: 4px; display: block;">License: <a
+                    href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
+                    style="color: #888; text-decoration: underline;">CC BY-NC 4.0</a></span>
         </div>
 
     </div>
@@ -1800,247 +1815,260 @@
                 }
             });
 
-            document.getElementById('toggle-ui').addEventListener('click', () => {
-                const ui = document.getElementById('ui-layer');
-                ui.style.display = (ui.style.display === 'none') ? 'block' : 'none';
-            });
+            document.getElementById('toggle-ui').addEventListener('click', toggleUI);
+        }
 
-            let rebuildTimeout = null;
-            document.getElementById('height-scale').addEventListener('input', (e) => {
-                HEIGHT_SCALE = parseInt(e.target.value);
-                if (chunkingEnabled) {
-                    if (rebuildTimeout) clearTimeout(rebuildTimeout);
-                    rebuildTimeout = setTimeout(async () => {
-                        await rebuildAllChunkMeshes();
-                        alignPlayerToTerrain(true);
-                    }, 150);
-                } else {
-                    updateTerrainGeometry();
-                    alignPlayerToTerrain(true);
-                }
-            });
+        function toggleUI() {
+            const ui = document.getElementById('ui-layer');
+            ui.style.display = (ui.style.display === 'none') ? 'block' : 'none';
+        }
 
-            document.getElementById('btn-smooth').addEventListener('change', async () => {
-                if (chunkingEnabled) {
+        function resetView() {
+            if (controls) {
+                const obj = controls.getObject();
+                obj.position.set(0, HEIGHT_SCALE + 300, 0);
+                obj.lookAt(0, 0, 0);
+                velocity.set(0, 0, 0);
+                if (!flightMode) alignPlayerToTerrain(true);
+            }
+        }
+
+        let rebuildTimeout = null;
+        document.getElementById('height-scale').addEventListener('input', (e) => {
+            HEIGHT_SCALE = parseInt(e.target.value);
+            if (chunkingEnabled) {
+                if (rebuildTimeout) clearTimeout(rebuildTimeout);
+                rebuildTimeout = setTimeout(async () => {
                     await rebuildAllChunkMeshes();
-                } else if (rawHeightData) await buildTerrain(rawHeightData, window.terrainW, window.terrainH);
-            });
-
-            function renderColorStops() {
-                const container = document.getElementById('color-stops-list');
-                if (!container) return;
-                container.innerHTML = '';
-                customColorStops.sort((a, b) => a.h - b.h);
-                customColorStops.forEach((stop, index) => {
-                    const row = document.createElement('div');
-                    row.style.display = 'flex';
-                    row.style.alignItems = 'center';
-                    row.style.marginBottom = '5px';
-
-                    const colorInput = document.createElement('input');
-                    colorInput.type = 'color';
-                    colorInput.value = stop.c;
-                    colorInput.style.marginRight = '5px';
-                    colorInput.style.flexShrink = '0';
-                    colorInput.addEventListener('input', (e) => { stop.c = e.target.value; updateCustomStyle(); });
-
-                    const heightInput = document.createElement('input');
-                    heightInput.type = 'range';
-                    heightInput.min = '0';
-                    heightInput.max = '1';
-                    heightInput.step = '0.01';
-                    heightInput.value = stop.h;
-                    heightInput.style.flexGrow = '1';
-                    heightInput.style.marginRight = '5px';
-
-                    const heightLabel = document.createElement('span');
-                    heightLabel.style.fontSize = '0.75rem';
-                    heightLabel.style.width = '35px';
-                    heightLabel.style.display = 'inline-block';
-                    heightLabel.style.textAlign = 'right';
-                    heightLabel.innerText = Math.round(stop.h * 100) + '%';
-
-                    heightInput.addEventListener('input', (e) => {
-                        const newVal = parseFloat(e.target.value);
-                        stop.h = newVal;
-
-                        // Push adjacent stops to maintain sorted order
-                        for (let i = index + 1; i < customColorStops.length; i++) {
-                            if (customColorStops[i].h < customColorStops[i - 1].h) {
-                                customColorStops[i].h = customColorStops[i - 1].h;
-                            }
-                        }
-                        for (let i = index - 1; i >= 0; i--) {
-                            if (customColorStops[i].h > customColorStops[i + 1].h) {
-                                customColorStops[i].h = customColorStops[i + 1].h;
-                            }
-                        }
-
-                        // Update all UI elements visually
-                        const rows = container.children;
-                        for (let i = 0; i < customColorStops.length; i++) {
-                            const r = rows[i];
-                            if (r) {
-                                const slider = r.querySelector('input[type="range"]');
-                                const lbl = r.querySelector('span');
-                                if (slider) slider.value = customColorStops[i].h;
-                                if (lbl) lbl.innerText = Math.round(customColorStops[i].h * 100) + '%';
-                            }
-                        }
-
-                        updateCustomStyle();
-                    });
-
-                    const delBtn = document.createElement('button');
-                    delBtn.innerText = 'X';
-                    delBtn.style.padding = '0 5px';
-                    delBtn.style.marginLeft = '5px';
-                    delBtn.style.background = 'rgba(231, 76, 60, 0.8)';
-                    delBtn.style.border = '1px solid #c0392b';
-                    delBtn.style.color = 'white';
-                    delBtn.style.cursor = 'pointer';
-                    delBtn.style.borderRadius = '3px';
-                    delBtn.addEventListener('click', () => {
-                        if (customColorStops.length <= 2) { alert('Need at least 2 color stops'); return; }
-                        customColorStops.splice(index, 1);
-                        renderColorStops();
-                        updateCustomStyle();
-                    });
-
-                    row.appendChild(colorInput);
-                    row.appendChild(heightInput);
-                    row.appendChild(heightLabel);
-                    row.appendChild(delBtn);
-                    container.appendChild(row);
-                });
+                    alignPlayerToTerrain(true);
+                }, 150);
+            } else {
+                updateTerrainGeometry();
+                alignPlayerToTerrain(true);
             }
+        });
 
-            let updateCustomStyleTimeout = null;
-            function updateCustomStyle() {
-                if (document.getElementById('texture-style').value !== 'custom') return;
-                if (updateCustomStyleTimeout) clearTimeout(updateCustomStyleTimeout);
-                updateCustomStyleTimeout = setTimeout(async () => {
-                    if (chunkingEnabled) {
-                        await rebuildAllChunkMeshes();
-                    } else if (rawHeightData) {
-                        await buildTerrain(rawHeightData, window.terrainW, window.terrainH);
+        document.getElementById('btn-smooth').addEventListener('change', async () => {
+            if (chunkingEnabled) {
+                await rebuildAllChunkMeshes();
+            } else if (rawHeightData) await buildTerrain(rawHeightData, window.terrainW, window.terrainH);
+        });
+
+        function renderColorStops() {
+            const container = document.getElementById('color-stops-list');
+            if (!container) return;
+            container.innerHTML = '';
+            customColorStops.sort((a, b) => a.h - b.h);
+            customColorStops.forEach((stop, index) => {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.marginBottom = '5px';
+
+                const colorInput = document.createElement('input');
+                colorInput.type = 'color';
+                colorInput.value = stop.c;
+                colorInput.style.marginRight = '5px';
+                colorInput.style.flexShrink = '0';
+                colorInput.addEventListener('input', (e) => { stop.c = e.target.value; updateCustomStyle(); });
+
+                const heightInput = document.createElement('input');
+                heightInput.type = 'range';
+                heightInput.min = '0';
+                heightInput.max = '1';
+                heightInput.step = '0.01';
+                heightInput.value = stop.h;
+                heightInput.style.flexGrow = '1';
+                heightInput.style.marginRight = '5px';
+
+                const heightLabel = document.createElement('span');
+                heightLabel.style.fontSize = '0.75rem';
+                heightLabel.style.width = '35px';
+                heightLabel.style.display = 'inline-block';
+                heightLabel.style.textAlign = 'right';
+                heightLabel.innerText = Math.round(stop.h * 100) + '%';
+
+                heightInput.addEventListener('input', (e) => {
+                    const newVal = parseFloat(e.target.value);
+                    stop.h = newVal;
+
+                    // Push adjacent stops to maintain sorted order
+                    for (let i = index + 1; i < customColorStops.length; i++) {
+                        if (customColorStops[i].h < customColorStops[i - 1].h) {
+                            customColorStops[i].h = customColorStops[i - 1].h;
+                        }
                     }
-                }, 100);
-            }
+                    for (let i = index - 1; i >= 0; i--) {
+                        if (customColorStops[i].h > customColorStops[i + 1].h) {
+                            customColorStops[i].h = customColorStops[i + 1].h;
+                        }
+                    }
 
-            const btnAddColor = document.getElementById('btn-add-color-stop');
-            if (btnAddColor) {
-                btnAddColor.addEventListener('click', () => {
-                    const h = customColorStops.length > 0 ? Math.min(1, customColorStops[customColorStops.length - 1].h + 0.1) : 0.5;
-                    customColorStops.push({ h: h, c: '#ffffff' });
+                    // Update all UI elements visually
+                    const rows = container.children;
+                    for (let i = 0; i < customColorStops.length; i++) {
+                        const r = rows[i];
+                        if (r) {
+                            const slider = r.querySelector('input[type="range"]');
+                            const lbl = r.querySelector('span');
+                            if (slider) slider.value = customColorStops[i].h;
+                            if (lbl) lbl.innerText = Math.round(customColorStops[i].h * 100) + '%';
+                        }
+                    }
+
+                    updateCustomStyle();
+                });
+
+                const delBtn = document.createElement('button');
+                delBtn.innerText = 'X';
+                delBtn.style.padding = '0 5px';
+                delBtn.style.marginLeft = '5px';
+                delBtn.style.background = 'rgba(231, 76, 60, 0.8)';
+                delBtn.style.border = '1px solid #c0392b';
+                delBtn.style.color = 'white';
+                delBtn.style.cursor = 'pointer';
+                delBtn.style.borderRadius = '3px';
+                delBtn.addEventListener('click', () => {
+                    if (customColorStops.length <= 2) { alert('Need at least 2 color stops'); return; }
+                    customColorStops.splice(index, 1);
                     renderColorStops();
                     updateCustomStyle();
                 });
-            }
-            renderColorStops(); // initial render
 
-            document.getElementById('texture-style').addEventListener('change', async (e) => {
-                const credit = document.getElementById('satellite-credit');
-                if (credit) credit.style.display = e.target.value === 'satellite' ? 'block' : 'none';
-
-                const customControls = document.getElementById('custom-color-controls');
-                if (customControls) customControls.style.display = e.target.value === 'custom' ? 'block' : 'none';
-
-                if (e.target.value === 'satellite' && !activeSatelliteTexture) {
-                    const loader = document.getElementById('loading-indicator');
-                    loader.style.display = 'block';
-                    document.getElementById('loading-msg').innerText = "Fetching Satellite Imagery...";
-                    await fetchAndApplySatellite();
-                    loader.style.display = 'none';
-                }
-
-                if (chunkingEnabled) {
-                    await rebuildAllChunkMeshes();
-                } else if (rawHeightData) await buildTerrain(rawHeightData, window.terrainW, window.terrainH);
-            });
-
-            document.getElementById('bg-style').addEventListener('change', (e) => {
-                let bgColor = 0x87CEEB; // default sky
-                if (e.target.value === 'greenscreen') bgColor = 0x00FF00;
-                else if (e.target.value === 'dark') bgColor = 0x111111;
-                else if (e.target.value === 'light') bgColor = 0xeeeeee;
-
-                scene.background.setHex(bgColor);
-                scene.fog.color.setHex(bgColor);
-            });
-
-            document.getElementById('btn-realistic').addEventListener('click', setRealisticScale);
-
-            document.getElementById('flight-mode-toggle').addEventListener('click', toggleFlightMode);
-
-            document.getElementById('resolution-selector').addEventListener('change', (e) => {
-                if (e.target.value === 'custom') {
-                    document.getElementById('custom-res-container').style.display = 'block';
-                } else {
-                    document.getElementById('custom-res-container').style.display = 'none';
-                    CHUNK_RES = parseInt(e.target.value);
-                    triggerReload();
-                }
-            });
-
-            document.getElementById('btn-apply-custom-res').addEventListener('click', () => {
-                const val = parseFloat(document.getElementById('custom-poly-input').value);
-                if (!isNaN(val) && val > 0) {
-                    CHUNK_RES = Math.round(Math.sqrt(val * 1000000));
-                    triggerReload();
-                }
-            });
-
-            document.getElementById('heightmap-upload').addEventListener('change', handleFileUpload);
-            document.getElementById('chunk-load-nearby').addEventListener('change', (e) => {
-                if (!e.target.checked) return;
-                chunkLoadAll = false;
-                if (chunkingEnabled && activeGeoTiffImage) {
-                    showChunkToast('Streaming nearby chunks only.', 2500);
-                    loadChunksAroundCamera(activeGeoTiffImage);
-                }
-            });
-            document.getElementById('chunk-load-all').addEventListener('change', (e) => {
-                if (!e.target.checked) return;
-                chunkLoadAll = true;
-                if (chunkingEnabled && activeGeoTiffImage) {
-                    showChunkToast('Loading full DEM chunk set...', 2500);
-                    loadChunksAroundCamera(activeGeoTiffImage);
-                }
-            });
-            document.getElementById('chunk-visibility-cull').addEventListener('change', (e) => {
-                chunkVisibilityCull = !!e.target.checked;
-                updateChunkVisibility();
-            });
-
-            document.getElementById('btn-export').addEventListener('click', exportGLB);
-
-            document.addEventListener('keydown', (e) => onKey(e, true));
-            document.addEventListener('keyup', (e) => onKey(e, false));
-
-            if (isMobile) setupTouchControls();
-            window.addEventListener('resize', onWindowResize);
-
-            // --- Mobile-specific handlers ---
-            document.getElementById('mobile-settings-btn').addEventListener('click', () => {
-                const ui = document.getElementById('ui-layer');
-                if (ui.style.display === 'none' || !ui.style.display) {
-                    ui.style.display = 'block';
-                    ui.style.opacity = '1';
-                } else {
-                    ui.style.display = 'none';
-                }
-            });
-            document.getElementById('mobile-upload-btn').addEventListener('click', () => {
-                document.getElementById('heightmap-upload').click();
-            });
-            document.getElementById('mobile-png-btn').addEventListener('click', () => {
-                exportUltraPng();
-            });
-            document.getElementById('mobile-cinema-btn').addEventListener('click', () => {
-                enterCinemaMode();
+                row.appendChild(colorInput);
+                row.appendChild(heightInput);
+                row.appendChild(heightLabel);
+                row.appendChild(delBtn);
+                container.appendChild(row);
             });
         }
+
+        let updateCustomStyleTimeout = null;
+        function updateCustomStyle() {
+            if (document.getElementById('texture-style').value !== 'custom') return;
+            if (updateCustomStyleTimeout) clearTimeout(updateCustomStyleTimeout);
+            updateCustomStyleTimeout = setTimeout(async () => {
+                if (chunkingEnabled) {
+                    await rebuildAllChunkMeshes();
+                } else if (rawHeightData) {
+                    await buildTerrain(rawHeightData, window.terrainW, window.terrainH);
+                }
+            }, 100);
+        }
+
+        const btnAddColor = document.getElementById('btn-add-color-stop');
+        if (btnAddColor) {
+            btnAddColor.addEventListener('click', () => {
+                const h = customColorStops.length > 0 ? Math.min(1, customColorStops[customColorStops.length - 1].h + 0.1) : 0.5;
+                customColorStops.push({ h: h, c: '#ffffff' });
+                renderColorStops();
+                updateCustomStyle();
+            });
+        }
+        renderColorStops(); // initial render
+
+        document.getElementById('texture-style').addEventListener('change', async (e) => {
+            const credit = document.getElementById('satellite-credit');
+            if (credit) credit.style.display = e.target.value === 'satellite' ? 'block' : 'none';
+
+            const customControls = document.getElementById('custom-color-controls');
+            if (customControls) customControls.style.display = e.target.value === 'custom' ? 'block' : 'none';
+
+            if (e.target.value === 'satellite' && !activeSatelliteTexture) {
+                const loader = document.getElementById('loading-indicator');
+                loader.style.display = 'block';
+                document.getElementById('loading-msg').innerText = "Fetching Satellite Imagery...";
+                await fetchAndApplySatellite();
+                loader.style.display = 'none';
+            }
+
+            if (chunkingEnabled) {
+                await rebuildAllChunkMeshes();
+            } else if (rawHeightData) await buildTerrain(rawHeightData, window.terrainW, window.terrainH);
+        });
+
+        document.getElementById('bg-style').addEventListener('change', (e) => {
+            let bgColor = 0x87CEEB; // default sky
+            if (e.target.value === 'greenscreen') bgColor = 0x00FF00;
+            else if (e.target.value === 'dark') bgColor = 0x111111;
+            else if (e.target.value === 'light') bgColor = 0xeeeeee;
+
+            scene.background.setHex(bgColor);
+            scene.fog.color.setHex(bgColor);
+        });
+
+        document.getElementById('btn-realistic').addEventListener('click', setRealisticScale);
+
+        document.getElementById('flight-mode-toggle').addEventListener('click', toggleFlightMode);
+
+        document.getElementById('resolution-selector').addEventListener('change', (e) => {
+            if (e.target.value === 'custom') {
+                document.getElementById('custom-res-container').style.display = 'block';
+            } else {
+                document.getElementById('custom-res-container').style.display = 'none';
+                CHUNK_RES = parseInt(e.target.value);
+                triggerReload();
+            }
+        });
+
+        document.getElementById('btn-apply-custom-res').addEventListener('click', () => {
+            const val = parseFloat(document.getElementById('custom-poly-input').value);
+            if (!isNaN(val) && val > 0) {
+                CHUNK_RES = Math.round(Math.sqrt(val * 1000000));
+                triggerReload();
+            }
+        });
+
+        document.getElementById('heightmap-upload').addEventListener('change', handleFileUpload);
+        document.getElementById('chunk-load-nearby').addEventListener('change', (e) => {
+            if (!e.target.checked) return;
+            chunkLoadAll = false;
+            if (chunkingEnabled && activeGeoTiffImage) {
+                showChunkToast('Streaming nearby chunks only.', 2500);
+                loadChunksAroundCamera(activeGeoTiffImage);
+            }
+        });
+        document.getElementById('chunk-load-all').addEventListener('change', (e) => {
+            if (!e.target.checked) return;
+            chunkLoadAll = true;
+            if (chunkingEnabled && activeGeoTiffImage) {
+                showChunkToast('Loading full DEM chunk set...', 2500);
+                loadChunksAroundCamera(activeGeoTiffImage);
+            }
+        });
+        document.getElementById('chunk-visibility-cull').addEventListener('change', (e) => {
+            chunkVisibilityCull = !!e.target.checked;
+            updateChunkVisibility();
+        });
+
+        document.getElementById('btn-export').addEventListener('click', exportGLB);
+
+        document.addEventListener('keydown', (e) => onKey(e, true));
+        document.addEventListener('keyup', (e) => onKey(e, false));
+
+        if (isMobile) setupTouchControls();
+        window.addEventListener('resize', onWindowResize);
+
+        // --- Mobile-specific handlers ---
+        document.getElementById('mobile-settings-btn').addEventListener('click', () => {
+            const ui = document.getElementById('ui-layer');
+            if (ui.style.display === 'none' || !ui.style.display) {
+                ui.style.display = 'block';
+                ui.style.opacity = '1';
+            } else {
+                ui.style.display = 'none';
+            }
+        });
+        document.getElementById('mobile-upload-btn').addEventListener('click', () => {
+            document.getElementById('heightmap-upload').click();
+        });
+        document.getElementById('mobile-png-btn').addEventListener('click', () => {
+            exportUltraPng();
+        });
+        document.getElementById('mobile-cinema-btn').addEventListener('click', () => {
+            enterCinemaMode();
+        });
+
 
         function setRealisticScale() {
             if (!demMetaData.hasMetadata) {
@@ -2932,7 +2960,7 @@
 
                 const videoW = liveRecVideo.videoWidth || 1920;
                 const videoH = liveRecVideo.videoHeight || 1080;
-                
+
                 // Use video dimensions directly (no upscaling) to reduce memory overhead
                 const canvasW = videoW;
                 const canvasH = videoH;
@@ -2988,7 +3016,7 @@
                     document.body.appendChild(a);
                     a.click();
                     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
-                    
+
                     sourceStream.getTracks().forEach(t => t.stop());
                     canvasStream.getTracks().forEach(t => t.stop());
                     clearInterval(liveRecInterval);
@@ -3026,14 +3054,21 @@
                     if (flightMode) moveDown = isDown;
                     else isRunning = isDown;
                     break;
+                case 'KeyC': if (flightMode) moveDown = isDown; break;
                 case 'KeyQ': if (flightMode) moveDown = isDown; break;
                 case 'KeyE': if (flightMode) moveUp = isDown; break;
                 case 'KeyF': if (isDown) toggleFlightMode(); break;
+                case 'KeyH': if (isDown && !isTypingInField()) toggleUI(); break;
+                case 'KeyR':
+                    if (isDown && !isTypingInField()) {
+                        if (event.altKey) window.toggleLiveRecord();
+                        else resetView();
+                    }
+                    break;
                 case 'KeyP': if (isDown && !event.repeat && !isTypingInField()) exportUltraPng(); break;
                 case 'KeyY': if (isDown && event.altKey && !isTypingInField()) window.setRecordingMask('youtube'); break;
                 case 'KeyI': if (isDown && event.altKey && !isTypingInField()) window.setRecordingMask('instagram'); break;
                 case 'KeyO': if (isDown && event.altKey && !isTypingInField()) window.setRecordingMask('off'); break;
-                case 'KeyR': if (isDown && event.altKey && !isTypingInField()) window.toggleLiveRecord(); break;
             }
         }
 
@@ -5658,7 +5693,7 @@
 
         // Download App handler
         const downloadBtn = document.getElementById('btn-download-app');
-        
+
         const checkInstallation = () => {
             if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
                 if (downloadBtn) downloadBtn.remove();
