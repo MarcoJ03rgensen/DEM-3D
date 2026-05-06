@@ -1047,7 +1047,12 @@
     </div>
 
     <div id="ui-layer">
-        <h1>3D DEM Explorer V1.0</h1>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+            <img src="/favicons/favicon-32x32.png" style="width: 24px; height: 24px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">
+            <h1 style="margin: 0; font-size: 1rem; flex: 1;">3D DEM Explorer V1.0</h1>
+            <a href="/info" style="color: #4a90e2; font-size: 0.7rem; text-decoration: none; border: 1px solid rgba(74, 144, 226, 0.4); padding: 3px 8px; border-radius: 5px; background: rgba(74, 144, 226, 0.1); transition: all 0.2s; white-space: nowrap;" onmouseover="this.style.background='rgba(74, 144, 226, 0.2)'; this.style.borderColor='#4a90e2';" onmouseout="this.style.background='rgba(74, 144, 226, 0.1)'; this.style.borderColor='rgba(74, 144, 226, 0.4)';">Info</a>
+        </div>
+
 
         <div class="control-group">
             <label>1. Detail Level</label>
@@ -1137,6 +1142,15 @@
             <label>4. Exports</label>
             <button id="btn-export" class="btn btn-green">💾 3D Model (.glb)</button>
             <button id="btn-open-cinema" class="btn btn-instagram" style="margin-top:6px;">🎬 4K Video Studio</button>
+            <button id="btn-download-app" class="btn btn-secondary" style="margin-top:6px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Desktop App
+            </button>
+        </div>
+        
+        <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 10px; font-size: 0.7rem; color: #888; text-align: center;">
+            Developed by <a href="https://marcojorgensen.com" target="_blank" style="color: #4a90e2; text-decoration: none; font-weight: 600;">Marco Jørgensen</a><br>
+            <span style="opacity: 0.6; margin-top: 4px; display: block;">Software License: MIT | Media: CC BY 4.0</span>
         </div>
 
     </div>
@@ -5617,6 +5631,10 @@
             renderer.render(scene, camera);
         }
 
+        // Download App handler
+        document.getElementById('btn-download-app').addEventListener('click', () => {
+            alert("The Desktop App is currently in development and will be available soon! \n\nYou can currently use the 'Install' option in your browser to add the app to your desktop/home screen.");
+        });
 
     </script>
 </body>
