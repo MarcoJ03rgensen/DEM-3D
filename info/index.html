@@ -679,6 +679,23 @@
             cursor: col-resize;
         }
 
+        @media (max-width: 768px) {
+            .comparison-slider {
+                aspect-ratio: 3/4;
+                min-height: 400px;
+                border-radius: 20px;
+            }
+            
+            .comparison-label {
+                font-size: 0.65rem !important;
+                padding: 6px 12px !important;
+                bottom: 15px !important;
+            }
+            
+            .label-before { left: 15px !important; }
+            .label-after { right: 15px !important; }
+        }
+
         .comparison-slider img {
             position: absolute;
             top: 0;
@@ -1200,7 +1217,7 @@
                     surfaces. Slide to compare the difference.</p>
             </div>
 
-            <div class="glass-card" style="padding: 1rem; border-radius: 40px; margin-bottom: 8rem;">
+            <div class="glass-card" style="padding: 0.5rem; border-radius: 32px; margin-bottom: 8rem;">
                 <div class="comparison-slider" id="smoothing-slider">
                     <!-- The 'After' image (Optimized) -->
                     <img src="smooth terrain active.png" alt="Optimized 3D Terrain with Vertex Normal Smoothing" id="slider-img-after">
