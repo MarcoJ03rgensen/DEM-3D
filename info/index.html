@@ -782,10 +782,35 @@
         window.addEventListener('scroll', reveal);
         window.addEventListener('load', reveal);
 
-        // Download App handler
-        document.querySelector('.download-btn').addEventListener('click', (e) => {
+        // PWA Install Logic
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
-            alert("The Desktop App is currently in development and will be available soon! \n\nYou can currently use the 'Install' option in your browser to add the app to your desktop/home screen.");
+            deferredPrompt = e;
+        });
+
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    console.log('SW registered');
+                }).catch(err => {
+                    console.log('SW reg error', err);
+                });
+            });
+        }
+
+        // Download App handler
+        document.querySelector('.download-btn').addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response: ${outcome}`);
+                deferredPrompt = null;
+            } else {
+                alert("The 'Install' option is already available in your browser's address bar or menu. \n\nIf you have already installed the app, check your desktop or application list!");
+            }
         });
     </script>
 </body>
