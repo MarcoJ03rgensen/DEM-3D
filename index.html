@@ -5132,11 +5132,13 @@
                 // Restore UI layer
                 document.getElementById('ui-layer').style.display = returnState ? returnState.uiDisplay : 'block';
                 
-                // If they were moving before, or if we just want to get them back into the action,
-                // we'll try to lock the controls. If we don't lock, we MUST show the blocker.
-                if (returnState && returnState.wasControlsLocked) {
-                    controls.lock();
-                } else {
+                // Proactively return to navigation mode for desktop users
+                // This avoids the 'Tap to Start' barrier when exiting Cinema Mode
+                controls.lock();
+                
+                // If lock fails or we want to ensure visibility, we can fallback to blocker
+                // but usually controls.lock() will handle hiding the blocker via its listener
+                if (!controls.isLocked) {
                     blocker.style.display = 'flex';
                     instructions.style.display = '';
                 }
