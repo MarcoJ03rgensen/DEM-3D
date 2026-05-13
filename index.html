@@ -3275,6 +3275,16 @@
 
         function onKey(event, isDown) {
             switch (event.code) {
+                case 'Escape':
+                    // Explicitly exit pointer lock on Escape keydown.
+                    // On macOS Safari the browser's native Esc handler sometimes
+                    // only dismisses its own info banner on the first press,
+                    // requiring a second press to actually release the lock.
+                    // Calling exitPointerLock() directly ensures one-press unlock.
+                    if (isDown && document.pointerLockElement) {
+                        document.exitPointerLock();
+                    }
+                    break;
                 case 'ArrowUp': case 'KeyW': moveForward = isDown; break;
                 case 'ArrowLeft': case 'KeyA': moveLeft = isDown; break;
                 case 'ArrowDown': case 'KeyS': moveBackward = isDown; break;
