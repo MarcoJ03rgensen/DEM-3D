@@ -2378,6 +2378,46 @@
             return heightArray;
         }
 
+        /**
+         * Erode valid pixels that border void (NoData) pixels.
+         * Bilinear resampling in GeoTIFF readRasters can blend valid elevations
+         * with NoData sentinels, producing intermediate values that survive the
+         * NoData detection but normalize to abnormally low heights.  This creates
+         * a visible "skirt" — lines/walls pointing downward — at void boundaries.
+         * Eroding 1 pixel into the valid region eliminates this artifact cleanly.
+         */
+        function erodeVoidBoundary(heightArray, width, height) {
+            const len = width * height;
+            // Quick scan: does this grid even contain any voids?
+            let hasVoid = false;
+            for (let i = 0; i < len; i++) {
+                if (heightArray[i] < 0) { hasVoid = true; break; }
+            }
+            if (!hasVoid) return heightArray;
+
+            // Build a mask of pixels to erode (valid pixels adjacent to void)
+            const erode = new Uint8Array(len);
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = y * width + x;
+                    if (heightArray[idx] < 0) continue; // already void
+                    // Check 4-connected neighbors for void
+                    if (
+                        (x > 0          && heightArray[idx - 1]     < 0) ||
+                        (x < width - 1  && heightArray[idx + 1]     < 0) ||
+                        (y > 0          && heightArray[idx - width]  < 0) ||
+                        (y < height - 1 && heightArray[idx + width]  < 0)
+                    ) {
+                        erode[idx] = 1;
+                    }
+                }
+            }
+            for (let i = 0; i < len; i++) {
+                if (erode[i]) heightArray[i] = -1;
+            }
+            return heightArray;
+        }
+
         function applyCustomColor(color, normH) {
             if (customColorStops.length === 0) { color.setHex(0xffffff); return; }
 
@@ -2428,6 +2468,7 @@
                 processedHeightData = heights; // same as buildChunkMesh
             }
             sanitizeNormalizedHeights(processedHeightData);
+            erodeVoidBoundary(processedHeightData, width, height);
 
             const maxChunkVerts = 255;
             const segX = width - 1;
@@ -3721,6 +3762,7 @@
                 }
             }
             sanitizeNormalizedHeights(outputData);
+            erodeVoidBoundary(outputData, targetWidth, targetHeight);
 
             msg.innerText = 'Generating preview...';
             generateGeoTiffPreviewFromArray(outputData, targetWidth, targetHeight);
@@ -4001,6 +4043,7 @@
                     heightData[i] = normalizeElevationToUnit(data[i], demMetaData.min, range);
                 }
                 sanitizeNormalizedHeights(heightData);
+                erodeVoidBoundary(heightData, readW, readH);
 
                 // Build mesh for this chunk
                 const { meshes, processedH } = await buildChunkMesh(heightData, readW, readH, cx, cy);
@@ -4037,6 +4080,7 @@
             const isSmooth = document.getElementById('btn-smooth').checked;
             const processedH = isSmooth ? await smoothHeights(heights, width, height) : heights;
             sanitizeNormalizedHeights(processedH);
+            erodeVoidBoundary(processedH, width, height);
 
             const style = document.getElementById('texture-style').value;
             const isSatellite = (style === 'satellite' && activeSatelliteTexture);
@@ -4804,6 +4848,7 @@
                 sampledHeights[i] = normalizeElevationToUnit(data[i], min, range);
             }
             sanitizeNormalizedHeights(sampledHeights);
+            erodeVoidBoundary(sampledHeights, width, height);
             rawHeightData = sampledHeights;
 
             if (currentAspect >= 1) {
