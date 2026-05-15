@@ -299,6 +299,20 @@
             letter-spacing: 0.5px;
         }
 
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .doc-btn img {
+            width: 14px;
+            height: 14px;
+            filter: brightness(0) invert(1);
+        }
+
         .doc-btn:hover {
             background: var(--accent-blue);
             color: white;
@@ -1285,10 +1299,12 @@
                 <img src="/favicons/android-chrome-192x192.png" alt="Logo" style="width: 24px; height: 24px;">
                 <span style="color: white; font-weight: 800; font-family: 'Outfit', sans-serif;"><span style="color: var(--accent-blue);">3D</span> DEM <span style="color: var(--accent-blue);">Explorer</span></span>
             </a>
-            <a href="/info" class="doc-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                Info
-            </a>
+            <div class="header-actions">
+                <a href="/info" class="doc-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    Info
+                </a>
+            </div>
         </div>
 
 
@@ -1402,7 +1418,13 @@
             </div>
             <span style="opacity: 0.5; font-size: 0.65rem;">License: <a
                     href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
-                    style="color: var(--text-secondary); text-decoration: underline;">CC BY-NC 4.0</a></span>
+                    style="color: var(--text-secondary); text-decoration: underline;">CC BY-NC 4.0</a> &middot; <a
+                    href="https://github.com/MarcoJ03rgensen/DEM-3D" target="_blank" rel="noreferrer"
+                    style="color: var(--text-secondary); text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                    <img src="https://github.githubassets.com/favicons/favicon.png" alt="GitHub"
+                        style="width: 12px; height: 12px; filter: brightness(0) invert(1);">
+                    GitHub
+                </a></span>
         </div>
 
     </div>
