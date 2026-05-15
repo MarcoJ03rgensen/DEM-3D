@@ -685,15 +685,20 @@
                 min-height: 400px;
                 border-radius: 20px;
             }
-            
+
             .comparison-label {
                 font-size: 0.65rem !important;
                 padding: 6px 12px !important;
                 bottom: 15px !important;
             }
-            
-            .label-before { left: 15px !important; }
-            .label-after { right: 15px !important; }
+
+            .label-before {
+                left: 15px !important;
+            }
+
+            .label-after {
+                right: 15px !important;
+            }
         }
 
         .comparison-slider img {
@@ -716,7 +721,7 @@
             overflow: hidden;
             z-index: 1;
             border-right: 2px solid white;
-            box-shadow: 10px 0 20px rgba(0,0,0,0.3);
+            box-shadow: 10px 0 20px rgba(0, 0, 0, 0.3);
         }
 
         .comparison-slider .slider-handle {
@@ -732,7 +737,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
             pointer-events: none;
         }
 
@@ -770,11 +775,16 @@
             pointer-events: none;
             text-transform: uppercase;
             letter-spacing: 1.5px;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .label-before { left: 24px; }
-        .label-after { right: 24px; }
+        .label-before {
+            left: 24px;
+        }
+
+        .label-after {
+            right: 24px;
+        }
 
         .image-container img {
             opacity: 0;
@@ -888,7 +898,7 @@
                 gap: 0.75rem;
             }
 
-            .hero-btns .launch-btn, 
+            .hero-btns .launch-btn,
             .hero-btns .download-btn {
                 width: 100%;
                 max-width: 260px;
@@ -902,12 +912,12 @@
                 grid-template-columns: 1fr;
                 border-radius: 24px;
             }
-            
+
             .control-group h4 {
                 font-size: 0.7rem;
                 margin-bottom: 1rem;
             }
-            
+
             .control-list li {
                 font-size: 0.85rem;
                 margin-bottom: 0.75rem;
@@ -936,11 +946,11 @@
             .pipeline-content h3 {
                 font-size: 1.2rem;
             }
-            
+
             .pipeline-content p {
                 font-size: 0.85rem;
             }
-            
+
             .badge {
                 font-size: 0.65rem;
                 padding: 4px 12px;
@@ -951,20 +961,20 @@
             .hero h1 {
                 font-size: 1.8rem;
             }
-            
+
             .pipeline-node {
                 width: 40px;
                 height: 40px;
             }
-            
+
             .pipeline::before {
                 left: 20px;
             }
-            
+
             .pipeline-node {
                 left: 20px;
             }
-            
+
             .pipeline-content {
                 width: calc(100% - 60px);
                 margin-left: 60px !important;
@@ -1029,7 +1039,7 @@
                         </svg>
                     </div>
                     <div class="pipeline-content">
-                        <h3>01. Upload</h3>
+                        <h3>1. Upload</h3>
                         <p>GeoTIFF Import · Drag & Drop · Spatial Chunking (demo)</p>
                     </div>
                 </div>
@@ -1044,7 +1054,7 @@
                         </svg>
                     </div>
                     <div class="pipeline-content">
-                        <h3>02. Explore</h3>
+                        <h3>2. Explore</h3>
                         <p>First-Person Navigation · Flight Mode · Collision Physics · Real-time Rendering</p>
                     </div>
                 </div>
@@ -1065,7 +1075,7 @@
                         </svg>
                     </div>
                     <div class="pipeline-content">
-                        <h3>03. Design</h3>
+                        <h3>3. Design</h3>
                         <p>Vertical Exaggeration · Satellite Imagery · Clay & Shadow · Dynamic Heatmaps · Custom Color
                             Ramps · Terrain Smoothing</p>
                     </div>
@@ -1082,7 +1092,7 @@
                         </svg>
                     </div>
                     <div class="pipeline-content">
-                        <h3>04. Export</h3>
+                        <h3>4. Export</h3>
                         <p>4K Video Studio · 8K PNG Snapshots · GLB 3D Models</p>
                     </div>
                 </div>
@@ -1126,7 +1136,7 @@
                     <h4>Tools</h4>
                     <ul class="control-list">
                         <li><span>Hide Interface</span> <span class="key">H</span></li>
-                        <li><span>Capture 4K PNG</span> <span class="key">P</span></li>
+                        <li><span>Capture 8K PNG</span> <span class="key">P</span></li>
                         <li><span>Lock Mouse</span> <span class="key">Click</span></li>
                         <li><span>Unlock Mouse</span> <span class="key">Esc</span></li>
                     </ul>
@@ -1134,10 +1144,14 @@
                 <div class="control-group">
                     <h4>Touch Interface</h4>
                     <ul class="control-list">
-                        <li><span>Move Character</span> <span class="key" style="background: var(--accent-blue-glow); color: #fff; border-color: var(--accent-blue);">Joystick</span></li>
+                        <li><span>Move Character</span> <span class="key"
+                                style="background: var(--accent-blue-glow); color: #fff; border-color: var(--accent-blue);">Joystick</span>
+                        </li>
                         <li><span>Look Around</span> <span class="key">Swipe Screen</span></li>
                         <li><span>Zoom View</span> <span class="key">Pinch Gesture</span></li>
-                        <li><span>Jump / Flight</span> <span class="key" style="background: var(--accent-orange-glow); color: #fff; border-color: var(--accent-orange);">Touch Buttons</span></li>
+                        <li><span>Jump / Flight</span> <span class="key"
+                                style="background: var(--accent-orange-glow); color: #fff; border-color: var(--accent-orange);">Touch
+                                Buttons</span></li>
                     </ul>
                 </div>
             </div>
@@ -1241,15 +1255,17 @@
             <div class="glass-card" style="padding: 0.5rem; border-radius: 32px; margin-bottom: 8rem;">
                 <div class="comparison-slider" id="smoothing-slider">
                     <!-- The 'After' image (Optimized) -->
-                    <img src="smooth terrain active.png" alt="Optimized 3D Terrain with Vertex Normal Smoothing" id="slider-img-after">
-                    
+                    <img src="smooth terrain active.png" alt="Optimized 3D Terrain with Vertex Normal Smoothing"
+                        id="slider-img-after">
+
                     <!-- The 'Before' image (Raw Data) inside clipped overlay -->
                     <div class="image-overlay" id="slider-overlay">
-                        <img src="smooth terrain inactive.png" alt="Raw GeoTIFF Terrain Data without Smoothing" id="slider-img-before">
+                        <img src="smooth terrain inactive.png" alt="Raw GeoTIFF Terrain Data without Smoothing"
+                            id="slider-img-before">
                     </div>
-                    
+
                     <div class="slider-handle" id="slider-handle"></div>
-                    
+
                     <div class="comparison-label label-before">Raw Heightmap</div>
                     <div class="comparison-label label-after">Smooth Surface</div>
                 </div>
@@ -1301,14 +1317,6 @@
         };
 
         window.addEventListener('scroll', reveal);
-        window.addEventListener('load', () => {
-            reveal();
-            // Handle smooth image loading
-            document.querySelectorAll('img').forEach(img => {
-                if (img.complete) img.classList.add('loaded');
-                else img.addEventListener('load', () => img.classList.add('loaded'));
-            });
-        });
 
         // PWA Install Logic
         let deferredPrompt;
@@ -1395,21 +1403,20 @@
             window.addEventListener('resize', () => {
                 beforeImg.style.width = slider.offsetWidth + 'px';
             });
-            
+
             // Wait for image load or small timeout to ensure offsetWidth is ready
             setTimeout(() => {
                 beforeImg.style.width = slider.offsetWidth + 'px';
             }, 100);
         }
 
-        window.addEventListener('load', () => {
-            reveal();
-            initComparisonSlider();
-            // Handle smooth image loading
-            document.querySelectorAll('img').forEach(img => {
-                if (img.complete) img.classList.add('loaded');
-                else img.addEventListener('load', () => img.classList.add('loaded'));
-            });
+        // Execute initialization immediately since script is at the end of body
+        reveal();
+        initComparisonSlider();
+        // Handle smooth image loading
+        document.querySelectorAll('img').forEach(img => {
+            if (img.complete) img.classList.add('loaded');
+            else img.addEventListener('load', () => img.classList.add('loaded'));
         });
 
         if (downloadBtn) {
